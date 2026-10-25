@@ -40,6 +40,7 @@ Select **Demo setup** in the footer, or **Meet Ray** before a link is configured
 - `src/components/ui/discord.tsx`: plain Discord chat, phone hardware, voice channel.
 - `src/data/story.tsx`: the six chat scripts and source excerpts.
 - `src/data/voice.ts`: readable audio cues synchronized to the generated recording.
+- `src/data/voice-scenario.json`: generated cue metadata imported from the source tree, following Vite asset rules.
 - `public/assets/voice/scenario.json`: measured timestamps, script, sources and voice assignments.
 - `public/assets/voice/ray-group-call.m4a`: the generated group conversation.
 - `src/App.tsx`: navigation, source dialogs, motion mode and live-demo setup.

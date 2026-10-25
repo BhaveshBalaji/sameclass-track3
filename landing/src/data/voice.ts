@@ -1,4 +1,4 @@
-import generated from "../../public/assets/voice/scenario.json";
+import generated from "./voice-scenario.json";
 import type { Person } from "./story";
 export type VoiceSource = "catalog" | "syllabus" | "reviews";
 export type VoiceCue = {

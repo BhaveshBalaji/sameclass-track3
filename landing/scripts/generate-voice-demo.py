@@ -197,7 +197,9 @@ def main():
         "cues": cues,
         "note": "Scripted illustrative scenario; course times, reviews and syllabus details are example data.",
     }
-    (OUT / "scenario.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    serialized = json.dumps(manifest, indent=2) + "\n"
+    (OUT / "scenario.json").write_text(serialized)
+    (ROOT / "landing/src/data/voice-scenario.json").write_text(serialized)
     print(
         f"Complete: {manifest['duration']:.1f}s, {target.stat().st_size / 1024:.0f} KiB. No key written to output.",
         flush=True,
