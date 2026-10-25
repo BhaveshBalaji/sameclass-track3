@@ -2,7 +2,7 @@
 
 ## Voice Ray (implemented; live acceptance pending)
 
-Voice is off by default. The approved [V0–V4 checklist](../docs/voice-ray-milestones.md) records actual verification and pending checks. The scheduled build added the Discord/ElevenLabs connection, course tools, separate student notes, named planner output, interruption controls and recap. This is not yet a verified live Discord voice demo: the project runtime key is missing and no two-human rehearsal has run. The ignored local `.env` has the dedicated agent and the server's only regular voice channel, **General**, preconfigured; review that channel before enabling voice.
+Voice is off by default in the checked-in configuration. The local runtime key has now been supplied, and voice is enabled in the ignored `.env` with the dedicated agent and **General** voice channel configured. Live agent/tool/generated-speech and realtime transcription checks passed, as did an empty-channel Discord connection and silent-playback proof. Commands are registered and the worker has been started. The two-person conversation/interruption checks and full rehearsals remain pending; these transport checks do not establish that humans hear or are attributed correctly. See [V0–V4 evidence](../docs/voice-ray-milestones.md).
 
 The ElevenLabs plugin created a dedicated development agent. Its nonsecret ID and tool/voice configuration are in `bot/voice-agent.json`; it requires authentication, has voice recording disabled and agent transcript retention set to one day. Separate Scribe transcription has its own provider retention policy; zero retention is not claimed. A plugin login does not automatically give the local worker an API key.
 
@@ -24,6 +24,8 @@ Use a runtime key from the same ElevenLabs workspace with agent conversation and
 ```bash
 npm run check:voice             # local setup, Opus and DAVE dependency checks; no inference
 npm run check:voice -- --live   # OPT-IN PAID synthetic agent/audio/tool proof; no Discord posts
+npm run check:voice -- --live --scribe # also transcribe the same generated synthetic audio
+npm run check:discord-voice -- --connect # worker stopped, EMPTY channel only; silent playback, no capture
 npm run test:voice             # offline protocol/controller/audio regressions
 npm run test:voice:planning    # isolated Postgres preference/planning regressions
 ```
@@ -39,6 +41,8 @@ After configuration and the provider proof, set `VOICE_ENABLED=true`, register c
 7. `/voice pause` and `/voice resume` are for the planning-session owner/moderator. `/voice leave` removes your capture; the last participant leaving disconnects Ray. `/voice end` ends the room for the owner/moderator. Channel departure and planning leave also revoke audio intake. Profile reset clears retained sources and ephemeral voice conversation context.
 
 The session stops after 20 minutes and has a 30-addressed-turn cap. End/rejoin manually after a connection failure or exhausted session; saved profiles persist but audio is never replayed. Speech bursts are limited to 30 seconds. Start with turn-taking and headphones: overlapping humans, background noise and acoustic echo are outside the demo's verified behavior. Voice activity stops buffered Ray audio; stale provider/tool results are suppressed. The controller reconnects the hosted agent for each addressed turn, restoring up to six bounded conversation entries; it does not promise seamless provider session recovery.
+
+Successful client-tool results explicitly send `is_error:false`, as required by the live provider. Some live voice sessions did not send `agent_response_complete`; after final answer text, a two-second quiet-audio fallback finishes the stream only when no tools are pending. Interruption still stops playback immediately. A focused regression covers quiet pre-tool acknowledgements and delayed research results so this fallback does not end a turn while research is running.
 
 Automatic proactive suggestions are deferred. Complete the two-person audio/source/interruption checks and the checklist's two rehearsals before marking voice milestones complete. No live source answers are replaced by demo fixtures.
 

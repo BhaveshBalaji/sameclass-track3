@@ -1,6 +1,6 @@
 import { getCiphers } from 'node:crypto';
 import { loadConfig, ConfigurationError, safeFailure } from '../src/config/index.js';
-import { ElevenAgent } from '../src/voice/elevenlabs.js';
+import { ElevenAgent, ScribeUtterance } from '../src/voice/elevenlabs.js';
 import { SpeechDecoder } from '../src/voice/audio.js';
 
 async function main(){
@@ -13,18 +13,19 @@ async function main(){
   if(missing.length)throw new ConfigurationError(`Missing voice configuration: ${missing.join(', ')}`);
   if(!process.argv.includes('--live'))return;
   // OPT-IN PAID: one synthetic generated conversation/tool round trip; no Discord posts.
-  let bytes=0,toolCalls=0;
+  let bytes=0,toolCalls=0;const chunks:Buffer[]=[];
   await new Promise<void>((resolve,reject)=>{
     const timer=setTimeout(()=>{agent.close();reject(new Error('Voice provider proof timed out.'));},30000);
     const agent=new ElevenAgent(config,{
-      audio:pcm=>{bytes+=pcm.length;},text:()=>{},
+      audio:(pcm,rate)=>{if(rate!==16000)throw new Error('Probe needs PCM 16 kHz.');bytes+=pcm.length;chunks.push(pcm);},text:()=>{},
       tool:async call=>{
         if(call.tool_name!=='get_my_notes')throw new Error('Unexpected probe tool.');
         toolCalls++;
         return {name:'Synthetic Probe',facts:[],instruction:'This is a synthetic integration check. Say briefly that no preferences are saved.'};
       },
-      complete:()=>{
+      complete:reason=>{
         clearTimeout(timer);agent.close();
+        console.log(JSON.stringify({check:'voice_agent_observation',completion:reason,toolCalls,audioBytes:bytes}));
         if(!bytes||!toolCalls)reject(new Error('Voice proof needs both generated audio and a tool call.'));
         else{console.log(JSON.stringify({check:'voice_agent_protocol',synthetic:true,toolCalls,audioBytes:bytes,discordAudioVerified:false,scribeVerified:false}));resolve();}
       },
@@ -34,5 +35,24 @@ async function main(){
       agent.message('Hey Ray, please use your notes tool to read back my saved preferences.');
     }).catch(error=>{clearTimeout(timer);agent.close();reject(error);});
   });
+  if(process.argv.includes('--scribe')){
+    await new Promise<void>((resolve,reject)=>{
+      let settled=false;
+      const scribe=new ScribeUtterance(config.ELEVENLABS_API_KEY,text=>{
+        settled=true;
+        console.log(JSON.stringify({check:'voice_scribe',synthetic:true,transcriptCharacters:text.length,audioBytes:bytes,discordAudioVerified:false}));resolve();
+      },()=>{settled=true;reject(new Error('Realtime transcription proof failed.'));});
+      // Reuse the generated synthetic answer: no extra speech generation or student audio.
+      // Pace it like microphone input, respecting the bounded pre-readiness queue.
+      void(async()=>{
+        for(const chunk of chunks){
+          if(settled)return;
+          scribe.write(chunk);
+          await new Promise(resolve=>setTimeout(resolve,Math.max(10,chunk.length/32)));
+        }
+        scribe.finish();
+      })().catch(()=>{scribe.close();reject(new Error('Realtime transcription proof failed.'));});
+    });
+  }
 }
 main().catch(error=>safeFailure('voice',error));

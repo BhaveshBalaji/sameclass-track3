@@ -6,7 +6,7 @@ export interface AgentCallbacks {
   audio(pcm: Buffer, sampleRate: number): void;
   text(text: string): void;
   tool(call: VoiceToolCall, signal: AbortSignal): Promise<unknown>;
-  complete(): void;
+  complete(reason?: 'provider' | 'audio_idle'): void;
   failed(): void;
 }
 type SocketFactory = (url: string, headers?: Record<string, string>) => WebSocket;
@@ -20,9 +20,15 @@ export class ElevenAgent {
   private rate = 16000;
   private calls = new Set<string>();
   private timer?: ReturnType<typeof setTimeout>;
+  private idleTimer?: ReturnType<typeof setTimeout>;
+  private requested = false;
+  private heardAudio = false;
+  private responseSeen = false;
+  private pendingTools = 0;
+  private completed = false;
   constructor(private config: Pick<Config, 'ELEVENLABS_API_KEY' | 'ELEVENLABS_AGENT_ID'>,
     private callbacks: AgentCallbacks, private socketFactory: SocketFactory = createSocket,
-    private request: typeof fetch = fetch) {}
+    private request: typeof fetch = fetch, private audioIdleMs = 2000) {}
 
   async start(context: string): Promise<void> {
     try {
@@ -61,6 +67,7 @@ export class ElevenAgent {
   }
   context(text: string): void { this.send({ type: 'contextual_update', text: text.slice(0,24000) }); }
   message(text: string): void {
+    this.requested = true;
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.fail(), 115000);
     this.send({ type: 'user_message', text: text.slice(0,4000) });
@@ -70,29 +77,41 @@ export class ElevenAgent {
   }
   private event(event: any): void {
     if (event.type === 'ping') this.send({ type: 'pong', event_id: event.ping_event.event_id });
-    if (event.type === 'audio') this.callbacks.audio(Buffer.from(event.audio_event.audio_base_64, 'base64'), this.rate);
-    if (event.type === 'agent_response') this.callbacks.text(String(event.agent_response_event.agent_response).slice(0,8000));
-    if (event.type === 'agent_response_complete') { clearTimeout(this.timer); this.callbacks.complete(); }
+    if (event.type === 'audio') { this.heardAudio = true;this.callbacks.audio(Buffer.from(event.audio_event.audio_base_64, 'base64'), this.rate);this.settleAudio(); }
+    if (event.type === 'agent_response') { this.responseSeen = true;this.callbacks.text(String(event.agent_response_event.agent_response).slice(0,8000));this.settleAudio(); }
+    if (event.type === 'agent_response_complete' && this.requested && this.responseSeen && !this.pendingTools) this.finish('provider');
     if (event.type === 'client_tool_call') {
       const call = event.client_tool_call as VoiceToolCall;
       if (!call || typeof call.tool_call_id !== 'string' || typeof call.tool_name !== 'string') throw new Error('Invalid tool call.');
       if (this.calls.has(call.tool_call_id)) return;
       if (this.calls.size >= 12) { this.fail(); return; }
       this.calls.add(call.tool_call_id);
+      this.pendingTools++;this.responseSeen=false;clearTimeout(this.idleTimer);
       void this.callbacks.tool(call, this.controller.signal).then(result => {
         const serialized=JSON.stringify(result);
         if (!this.closed) this.send({ type: 'client_tool_result', tool_call_id: call.tool_call_id,
-          result:serialized.length<=24000?serialized:JSON.stringify({error:'Result is too large for a spoken answer. Refer to the linked text result or /plan profile for full details; do not invent a summary.'}) });
+          result:serialized.length<=24000?serialized:JSON.stringify({error:'Result is too large for a spoken answer. Refer to the linked text result or /plan profile for full details; do not invent a summary.'}),is_error:false });
       }).catch(() => {
         this.send({ type: 'client_tool_result', tool_call_id: call.tool_call_id, result: 'The requested action could not be completed.', is_error: true });
-      });
+      }).finally(()=>{this.pendingTools--;this.settleAudio();});
     }
     if (event.type === 'error' || event.type === 'client_error') this.fail();
+  }
+  private settleAudio():void{
+    clearTimeout(this.idleTimer);
+    if(!this.requested||!this.heardAudio||!this.responseSeen||this.pendingTools||this.completed)return;
+    // Some live voice sessions omit agent_response_complete. Finish only after
+    // final answer text and quiet audio, never while a research tool is running.
+    this.idleTimer=setTimeout(()=>{if(!this.closed&&!this.pendingTools)this.finish('audio_idle');},this.audioIdleMs);
+  }
+  private finish(reason:'provider'|'audio_idle'):void{
+    if(this.completed||this.closed)return;
+    this.completed=true;clearTimeout(this.timer);clearTimeout(this.idleTimer);this.callbacks.complete(reason);
   }
   private fail(): void { if (this.closed) return; this.close(); this.callbacks.failed(); }
   close(): void {
     if (this.closed) return;
-    this.closed = true; clearTimeout(this.timer); this.controller.abort();
+    this.closed = true; clearTimeout(this.timer);clearTimeout(this.idleTimer); this.controller.abort();
     this.socket?.close();
   }
 }

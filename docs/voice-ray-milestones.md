@@ -162,7 +162,15 @@ The pre-existing local supervisor/Gateway worker was still running and was left 
 
 Found and fixed a transcript-admission race: an utterance waiting on authorization or note storage could otherwise reopen the provider after pause/resume, context reset or leave/rejoin. Admission now carries an abort signal through the local note transaction, and interruption invalidates pending admissions before they can start a provider turn. Eight voice regressions and six isolated-Postgres voice regressions passed, including all six lifecycle/wait combinations and prevention of retaining a cancelled source after reset. Build passed. Rechecking setup still reports only the missing runtime key; no live verification is inferred from these tests.
 
-- [ ] V0: transport/controller/dependency code tested; runtime-key/channel setup and real two-person voice proof pending.
+### Runtime key supplied — live transport checks
+
+The user supplied the runtime key privately. Agent read and signed-URL access returned HTTP 200. The first live tool round trip exposed a real protocol omission: successful `client_tool_result` messages require `is_error:false`. Fixed it and added a wire-contract regression. Actual voice sessions also omitted the configured `agent_response_complete` event; the bridge now has a bounded two-second quiet-audio completion fallback after final answer text, disabled while tools are pending. The new regression verifies that a pre-tool acknowledgement or a delayed tool result does not prematurely finish a turn. Build and nine voice tests passed.
+
+The combined opt-in live probe passed with one local notes-tool call and 261,120 bytes of generated PCM speech. Reusing that synthetic audio through Scribe produced a 149-character finalized transcript. No student audio or text-chat fixtures were used or posted. The probe paces audio like a microphone to respect the five-second pre-readiness buffer. This verifies authenticated agent conversation, local tool response, speech generation and realtime transcription; it does not verify Discord microphone capture or human audibility.
+
+With the normal worker stopped and General empty, the Discord proof reached a ready voice connection and finished half a second of silent raw-PCM playback through the actual encoding/transport path. No member audio was captured. Afterwards enabled voice in the ignored local `.env`, registered `/voice` commands, and started the single local supervisor/worker. Startup confirmed Voice Ray controls and Gateway readiness; the database and both Python APIs passed health checks. Real participant read-back, interruptions, named group results and two rehearsals remain pending. The user has been invited to perform the live check; no milestone is marked complete on the strength of the synthetic or silent probes alone.
+
+- [ ] V0: live agent/tool/speech/transcription and empty-channel Discord playback proved; real two-person microphone/hearing/interruptions pending.
 - [ ] V1: course tool and follow-up code tested; live spoken questions pending.
 - [ ] V2: separate notes/corrections/reset tested with isolated Postgres; live speaker recognition and read-back pending.
 - [ ] V3: named allocation presentation and stale-result guards tested; live group readout pending.

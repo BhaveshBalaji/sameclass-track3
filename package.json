@@ -13,6 +13,7 @@
     "test:voice": "npm run test:voice --workspace bot",
     "test:voice:planning": "npm run test:voice:planning --workspace bot",
     "check:voice": "npm run check:voice --workspace bot --",
+    "check:discord-voice": "npm run check:discord-voice --workspace bot --",
     "build": "npm run build --workspace bot",
     "typecheck": "npm run typecheck --workspace bot",
     "test": "npm run test --workspace bot",

@@ -60,7 +60,7 @@ test('real Opus packets decode into Scribe audio; output converts to Discord PCM
 test('agent protocol authenticates, dispatches tools and suppresses late output after cancellation',async()=>{
   const socket=new Socket();let completeTool!:(value:unknown)=>void;let toolSignal:AbortSignal|undefined;let played=0;
   const callbacks:AgentCallbacks={audio:()=>played++,text:()=>{},complete:()=>{},failed:()=>assert.fail('unexpected failure'),
-    tool:async(_call,signal)=>{toolSignal=signal;return new Promise(resolve=>{completeTool=resolve;});}};
+    tool:async(call,signal)=>{if(call.tool_call_id==='successful')return {status:'ok'};toolSignal=signal;return new Promise(resolve=>{completeTool=resolve;});}};
   const agent=new ElevenAgent({ELEVENLABS_API_KEY:'synthetic',ELEVENLABS_AGENT_ID:'synthetic'},callbacks,()=>{
     queueMicrotask(()=>{socket.emit('open');socket.event({type:'conversation_initiation_metadata',conversation_initiation_metadata_event:{agent_output_audio_format:'pcm_16000'}});});
     return socket as unknown as WebSocket;
@@ -71,12 +71,15 @@ test('agent protocol authenticates, dispatches tools and suppresses late output 
   });
   await agent.start('synthetic context');agent.message('Hey Ray, research this course.');
   assert.ok(socket.sent.some(e=>e.type==='contextual_update'));
+  socket.event({type:'client_tool_call',client_tool_call:{tool_name:'get_my_notes',tool_call_id:'successful',parameters:{}}});
+  await tick();
+  assert.deepEqual(socket.sent.find(e=>e.type==='client_tool_result'),{type:'client_tool_result',tool_call_id:'successful',result:'{"status":"ok"}',is_error:false});
   socket.event({type:'client_tool_call',client_tool_call:{tool_name:'research_course',tool_call_id:'call1',parameters:{question:'test'}}});
   socket.event({type:'audio',audio_event:{audio_base_64:Buffer.alloc(4).toString('base64')}});
   assert.equal(played,1);agent.close();assert.equal(toolSignal?.aborted,true);
   completeTool({answer:'late'});await tick();
   socket.event({type:'audio',audio_event:{audio_base_64:'AAAA'}});
-  assert.equal(played,1);assert.equal(socket.sent.filter(e=>e.type==='client_tool_result').length,0);
+  assert.equal(played,1);assert.equal(socket.sent.filter(e=>e.type==='client_tool_result'&&e.tool_call_id==='call1').length,0);
 });
 
 test('Scribe buffers before readiness and returns only completed transcripts',()=>{
@@ -87,6 +90,28 @@ test('Scribe buffers before readiness and returns only completed transcripts',()
   assert.equal(socket.sent[0].message_type,'input_audio_chunk');assert.equal(socket.sent.at(-1).commit,true);
   socket.event({message_type:'partial_transcript',text:'wrong partial'});assert.equal(transcripts.length,0);
   socket.event({message_type:'committed_transcript',text:'Hey Ray, hello.'});assert.deepEqual(transcripts,['Hey Ray, hello.']);
+});
+
+test('audio-idle completion waits for tool results and final answer text when the provider omits its completion event',async()=>{
+  const socket=new Socket();let release!:(result:unknown)=>void,completions=0;
+  const agent=new ElevenAgent({ELEVENLABS_API_KEY:'synthetic',ELEVENLABS_AGENT_ID:'synthetic'},{
+    audio:()=>{},text:()=>{},failed:()=>assert.fail('unexpected failure'),
+    tool:async()=>new Promise(resolve=>{release=resolve;}),complete:reason=>{assert.equal(reason,'audio_idle');completions++;agent.close();},
+  },()=>{
+    queueMicrotask(()=>{socket.emit('open');socket.event({type:'conversation_initiation_metadata',conversation_initiation_metadata_event:{agent_output_audio_format:'pcm_16000'}});});
+    return socket as unknown as WebSocket;
+  },async()=>Response.json({signed_url:'wss://api.elevenlabs.io/v1/convai/conversation?token=synthetic'}),10);
+  await agent.start('test');agent.message('Hey Ray, research this course.');
+  socket.event({type:'agent_response_complete'});assert.equal(completions,0);
+  socket.event({type:'agent_response',agent_response_event:{agent_response:'Let me check.'}});
+  socket.event({type:'audio',audio_event:{audio_base_64:'AAAA'}});
+  socket.event({type:'client_tool_call',client_tool_call:{tool_call_id:'pending',tool_name:'research_course',parameters:{question:'test'}}});
+  await new Promise(resolve=>setTimeout(resolve,25));assert.equal(completions,0);
+  release({answer:'Synthetic result'});await tick();
+  await new Promise(resolve=>setTimeout(resolve,25));assert.equal(completions,0);
+  socket.event({type:'agent_response',agent_response_event:{agent_response:'Here is the result.'}});
+  socket.event({type:'audio',audio_event:{audio_base_64:'AAAA'}});
+  await new Promise(resolve=>setTimeout(resolve,25));assert.equal(completions,1);
 });
 
 test('roster consent, follow-up ownership, pause and stale callbacks are enforced',async()=>{

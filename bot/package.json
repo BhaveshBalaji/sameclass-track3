@@ -10,6 +10,7 @@
     "test:voice": "tsx --test tests/voice.test.ts",
     "test:voice:planning": "tsx --test tests/voice-planning.test.ts",
     "check:voice": "tsx scripts/check-voice.ts",
+    "check:discord-voice": "tsx scripts/check-discord-voice.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test tests/foundation.test.ts tests/planning-unit.test.ts tests/catalog.test.ts tests/research.test.ts tests/research-followup.test.ts tests/research-chain.test.ts tests/context-syllabus.test.ts",
