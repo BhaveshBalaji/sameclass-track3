@@ -7,6 +7,8 @@ import type { Config } from '../../config/index.js';
 import { PlanningError, type Outgoing, type Room } from '../../domain/planning.js';
 import type { PlanningApplication } from '../../application/planning.js';
 import { discordSettings } from './commands.js';
+import { DiscordVoice } from './voice.js';
+import { PlanningVoiceBackend } from '../../application/voice.js';
 
 export function allowedMentions(ids: string[]) {
   return { parse: [] as ('roles' | 'users' | 'everyone')[], users: [...new Set(ids)].filter(id => /^\d{17,20}$/.test(id)), repliedUser: false };
@@ -29,7 +31,8 @@ export function components(body: Outgoing) {
 }
 export async function connectDiscord(config: Config, app: PlanningApplication): Promise<Client> {
   const settings = discordSettings(config);
-  const client = new Client({ intents: [GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.MessageContent],
+  const client = new Client({ intents: [GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.MessageContent,
+    ...(config.VOICE_ENABLED?[GatewayIntentBits.GuildVoiceStates]:[])],
     allowedMentions: allowedMentions([]) });
   const permitted = (guild: string | null, channel: string | null) => guild === settings.guildId && Boolean(channel && settings.channels.has(channel));
   async function deliver(room: Room, interaction?:ChatInputCommandInteraction | ButtonInteraction) {
@@ -47,6 +50,14 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
     });
     if (!delivered) throw new Error('Discord delivery could not be confirmed.');
   }
+  const voice = new DiscordVoice(config,client,app,(room,sessionId)=>new PlanningVoiceBackend(app,room,sessionId,()=>deliver(room)));
+  client.once(Events.ClientReady,()=>{if(config.VOICE_ENABLED)console.log('Voice Ray controls are enabled.');});
+  client.on(Events.VoiceStateUpdate,(_before,after)=>{
+    if(after.id===client.user?.id&&after.channelId!==config.DISCORD_VOICE_CHANNEL_ID)voice.close();
+    else voice.departed(after.id,after.channelId);
+  });
+  const destroy=client.destroy.bind(client);
+  client.destroy=async()=>{voice.close();await destroy();};
   async function onInteraction(interaction: Interaction) {
     if (interaction.isAutocomplete()) {
       await interaction.respond(permitted(interaction.guildId,interaction.channelId)
@@ -63,6 +74,7 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
     await interaction.deferReply();
     try {
       if (interaction.isChatInputCommand()) {
+        if(interaction.commandName==='voice'){await voice.command(interaction,actor);return;}
         if (interaction.commandName === 'ping') {
           await interaction.editReply({ content: 'Ray is online.', allowedMentions: allowedMentions([]) }); return;
         }
@@ -85,6 +97,7 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
         else if (action === 'reset' && token) await app.confirmReset(room,interaction.id,actor,sessionId,token);
         else throw new Error('Unknown planning control.');
       }
+      await voice.reconcile();
       await deliver(room,interaction);
     } catch (error) {
       // Domain messages have no credentials/model payload. Other failures get a generic diagnostic.

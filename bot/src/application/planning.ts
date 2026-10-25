@@ -145,6 +145,27 @@ export class PlanningApplication {
     return this.research ? this.research.answer(question,term,context)
       : Promise.resolve('Course research is not connected in this test environment.');
   }
+  /** Voice tools share research memory and delivery, with server-bound actor/session context. */
+  async voiceQuestion(room:Room,sessionId:string,actor:Actor,question:string,signal:AbortSignal):Promise<string>{
+    const state=await this.store.read(room);
+    if(state?.id!==sessionId||!state.participants[actor.userId]?.active)throw new PlanningError('Voice planning membership expired.');
+    const profileVersion=state.participants[actor.userId]!.profile.version;
+    signal.throwIfAborted();
+    const requestId=`voice:${randomUUID()}`,prior=await this.memory.begin(room,actor.userId);
+    const context:ResearchContext={turns:prior.turns,signal};
+    const answer=await this.answerCourse(question,state.term,context);
+    signal.throwIfAborted();
+    const current=await this.store.read(room);
+    if(current?.id!==sessionId||!current.participants[actor.userId]?.active||current.participants[actor.userId]!.profile.version!==profileVersion)throw new PlanningError('Voice planning context changed.');
+    await this.memory.finish(room,actor.userId,prior.version,prior.turns,{requestId,question:question.slice(0,2000),answer:answer.slice(0,4000),
+      tasks:context.result?.tasks??[],instructors:context.result?.instructors??[],sources:context.result?.sources??[],syllabusCoverage:context.result?.syllabusCoverage});
+    await this.store.transact(room,`answer:${requestId}`,async tx=>{
+      signal.throwIfAborted();
+      if(tx.state?.id!==sessionId||!tx.state.participants[actor.userId]?.active||tx.state.participants[actor.userId]!.profile.version!==profileVersion)throw new PlanningError('Voice planning context changed.');
+      await tx.enqueue({...response(answer,[actor.userId]),requestId});
+    });
+    return answer;
+  }
   async message(event: Incoming): Promise<void> {
     if (event.bot || event.webhook) return;
     if (event.botMention || event.replyTo) {

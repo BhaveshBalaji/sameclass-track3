@@ -2,6 +2,13 @@ import { REST, Routes, SlashCommandBuilder } from 'discord.js';
 import { ConfigurationError, type Config } from '../../config/index.js';
 
 export const commandDefinitions = [
+  new SlashCommandBuilder().setName('voice').setDescription('Use Voice Ray in the linked planning session.')
+    .addSubcommand(c=>c.setName('join').setDescription('Opt in: audio goes to ElevenLabs; saved notes may go to OpenRouter.')
+      .addBooleanOption(o=>o.setName('consent').setDescription('I agree to this voice processing. False shows the notice.').setRequired(true)))
+    .addSubcommand(c=>c.setName('leave').setDescription('Stop including my audio.'))
+    .addSubcommand(c=>c.setName('pause').setDescription('Pause listening (session owner/moderator).'))
+    .addSubcommand(c=>c.setName('resume').setDescription('Resume listening (session owner/moderator).'))
+    .addSubcommand(c=>c.setName('end').setDescription('End the voice session (session owner/moderator).')),
   new SlashCommandBuilder().setName('ping').setDescription('Check whether Ray is connected.'),
   new SlashCommandBuilder().setName('ask').setDescription('Ask Ray about courses, syllabi or professors (processed by OpenRouter).')
     .addStringOption(o => o.setName('question').setDescription('Your course/syllabus question').setRequired(true).setMaxLength(1000)),

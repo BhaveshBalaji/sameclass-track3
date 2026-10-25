@@ -7,6 +7,9 @@ import { parseConfig } from '../src/config/index.js';
 import { discordPCM, SpeechDecoder } from '../src/voice/audio.js';
 import { ElevenAgent, ScribeUtterance, type AgentCallbacks } from '../src/voice/elevenlabs.js';
 import { VoiceSession, type ConversationalConnection } from '../src/voice/session.js';
+import { PlanningVoiceBackend } from '../src/application/voice.js';
+import type { PlanningApplication } from '../src/application/planning.js';
+import { commandDefinitions } from '../src/transport/discord/commands.js';
 
 class Socket extends EventEmitter {
   readyState = 1;
@@ -25,6 +28,20 @@ test('voice is opt-in and errors identify configuration names without exposing k
   assert.throws(()=>parseConfig({VOICE_ENABLED:'true',ELEVENLABS_API_KEY:'secret-value'}),error=>{
     assert.match(String(error),/ELEVENLABS_AGENT_ID/);assert.doesNotMatch(String(error),/secret-value/);return true;
   });
+});
+
+test('voice controls require explicit consent and backend tool arguments cannot impersonate a member',async()=>{
+  const commands=commandDefinitions.find(c=>c.name==='voice')!;
+  const join=commands.options!.find(c=>c.name==='join')!;
+  assert.ok('options' in join&&join.options?.some(o=>o.name==='consent'&&o.required));
+  let called=0;const app={store:{read:async()=>({id:'session',participants:{alice:{active:true}}})},voiceQuestion:async()=>{called++;return 'answer';}};
+  const backend=new PlanningVoiceBackend(app as unknown as PlanningApplication,{guildId:'guild',channelId:'text'},'session',async()=>{});
+  await assert.rejects(()=>backend.tool(actor,{tool_name:'research_course',tool_call_id:'forged',parameters:{question:'test',userId:'bob'}},new AbortController().signal));
+  await assert.rejects(()=>backend.tool(other,{tool_name:'research_course',tool_call_id:'outsider',parameters:{question:'test'}},new AbortController().signal),/expired/);
+  await assert.rejects(()=>backend.tool(actor,{tool_name:'delete_session',tool_call_id:'unknown',parameters:{}},new AbortController().signal));
+  assert.equal(called,0);
+  const answer=await backend.tool(actor,{tool_name:'research_course',tool_call_id:'valid',parameters:{question:'test'}},new AbortController().signal);
+  assert.equal(called,1);assert.equal((answer as {answer:string}).answer,'answer');
 });
 
 test('real Opus packets decode into Scribe audio; output converts to Discord PCM',()=>{

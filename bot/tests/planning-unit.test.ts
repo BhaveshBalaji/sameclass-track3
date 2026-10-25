@@ -14,7 +14,7 @@ test('persistent button IDs fit Discord limits and preserve session identity', (
     sessionId:'12345678-1234-1234-1234-123456789012',token:'abcdefab-abcd-abcd-abcd-abcdefabcdef'}] });
   const id = rows[0]!.toJSON().components[0]!;
   assert.ok('custom_id' in id && id.custom_id.length <= 100);
-  assert.deepEqual(commandDefinitions.map(c => c.name),['ping','ask','plan']);
+  assert.deepEqual(commandDefinitions.map(c => c.name),['voice','ping','ask','plan']);
 });
 test('profile sources require matching author, existing message and verbatim evidence', () => {
   assert.throws(() => validatePatch({ facts:[{field:'campus',strength:'hard',values:['Tempe'],sources:[{messageId:'m',quote:'Tempe'}]}] },

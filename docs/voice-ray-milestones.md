@@ -134,6 +134,12 @@ Five focused offline tests passed, including an actual synthetic Opus encode/dec
 
 The project has Discord credentials but no `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID` or configured voice channel. The plugin connection can manage agents but does not supply a runtime key to the Node worker. Set the dedicated agent ID from the manifest and a runtime key/channel locally before live Scribe/agent/Discord proof. No real two-person voice check has run; V0 remains incomplete. Continue independently testable wiring and later services as scaffolding, not as a claim that the live transport gate passed.
 
+### V1 implementation wiring (live acceptance pending)
+
+Added `/voice join consent:true`, leave, owner/moderator pause/resume/end, conditional voice-state intent, membership reconciliation and shutdown cleanup. The research client tool uses the existing research service, active semester, persisted per-user research context and text outbox. Calls are actor/session-bound, reject arbitrary tool names/extra identity arguments, propagate interruption cancellation and recheck membership/profile versions before publication. Each addressed spoken turn uses at most one agent connection; interruptions close it and the next turn restores bounded local conversation context. This deliberate reconnect simplifies late-audio suppression until the live transport is proven.
+
+The build, 31 existing offline regressions and six voice checks pass. A command-contract expectation was updated for the added `/voice` command. Live syllabi/professor speech, follow-up timing and interruption latency remain unverified until runtime credentials and Discord participants are available. Quiet note intake is deliberately still a no-op here; V2 adds it, so V1 is not presented as note-taking support.
+
 - [ ] V0: voice transport and conversational tool proof.
 - [ ] V1: live conversational course questions.
 - [ ] V2: separate student notes and corrections.
