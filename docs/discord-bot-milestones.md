@@ -1,6 +1,6 @@
 # Ray Discord bot: implementation milestones
 
-Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestone 0 local foundation and Milestone 1 implementation are in place. Milestone 1 real-server workflow verification is pending. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
+Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestones 0 and 1 are complete: local foundation, Discord preference intake, replay verification, and the user-confirmed private-server smoke test. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
 
 ## 1. Agreed scope
 
@@ -343,7 +343,7 @@ Do not automate ordinary user accounts or pretend webhook/bot messages are disti
 - [x] Current Discord guidance retrieved through Context7 MCP and official references.
 - [x] Detailed milestone plan and readable synthetic conversation prepared.
 - [x] Milestone 0: local foundation, portable configuration, runtime/model/checkpointer checks and scenarios. See verification below.
-- [ ] Milestone 1: implemented; real Discord workflow and restart smoke verification pending.
+- [x] Milestone 1: Discord preference workflow, replay checks, user-confirmed live smoke test and restart persistence.
 - [ ] Milestone 2: one live catalog path.
 - [ ] Milestone 3: bounded parallel research.
 - [ ] Milestone 4: group recommendations, refinement and expanded complex-workflow mock suite.
@@ -370,4 +370,4 @@ Implemented on `demo`: Gateway intake, guild/channel allowlisting, `/ping`, `/as
 
 The fixture replay uses four synthetic students in a separate `ray_m1_test` database. Offline checks and database regression tests cover wrong-author replies, duplicate events, stale work, resets, delivery uncertainty and cancelled participation questions. The live OpenRouter/DeepSeek/Relace replay passed author isolation, hard/soft facts, explicit flexibility, silent-participant replies and correction retention. Synthetic fixtures are opt-in test inputs, never a product fallback. The extraction prompt was clarified after the initial live replay omitted facts; broader model regression scenarios remain Milestone 4.
 
-Discord commands were registered and the Gateway connected successfully to the configured test server/channel. Human `/ping`, start/join, actual mention, clarification reply and post-restart checks remain pending; do not call this milestone complete before those pass. Course, syllabus and RMP answers intentionally remain disconnected here. Stop before Milestone 2.
+Discord commands were registered and the Gateway connected successfully to the configured test server/channel. The user reported “Everything worked” for the requested `/ping`, start/join, actual mention, summary and conditional clarification-reply smoke workflow. Database metadata confirmed an active joined participant with extracted facts. After that confirmation, the worker was stopped and restarted: the Gateway reconnected, and a comparison of the complete persisted session state before/after restart matched exactly. No student content or credentials were included in these verification notes. Milestone 1 is complete. Course, syllabus and RMP answers intentionally remain disconnected here. Stop before Milestone 2.

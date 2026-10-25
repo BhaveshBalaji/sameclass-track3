@@ -105,4 +105,4 @@ Replay uses the same application handlers as Discord, synthetic identities and a
 
 The [readable four-student scenarios](../docs/mock-chat-scenarios.md) and `bot/test-data/conversations/four-students.json` cover author isolation, a silent participant, direct replies, corrections and question isolation. Milestone 4 expands this suite to complex workflows and evidence failures.
 
-The live synthetic OpenRouter replay and Gateway connection passed. Human command/mention/direct-reply and post-restart checks in the private test server remain required before declaring Milestone 1 complete.
+The live synthetic OpenRouter replay passed, and the user confirmed the requested private-server smoke workflow worked. A subsequent worker restart reconnected the Gateway and preserved the live session state exactly. Milestone 1 is complete; course research remains disconnected.
