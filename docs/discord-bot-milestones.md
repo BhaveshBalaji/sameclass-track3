@@ -1,6 +1,6 @@
 # Ray Discord bot: implementation milestones
 
-Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Application implementation has not started. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
+Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestone 0 local foundation is implemented; Discord interaction implementation has not started. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
 
 ## 1. Agreed scope
 
@@ -123,7 +123,7 @@ Metadata checked October 24, 2026 (America/Phoenix) against the [model listing](
 - Relace lists `tools`, `tool_choice`, `response_format`, `structured_outputs` and reasoning controls, with a 1,048,576-token context window. This is advertised capability, not proof of our schemas or worker loop working.
 - Relace lists automatic/required/specific-function tool choice, but not `tool_choice: none`. Omit tool definitions on extraction/synthesis calls that must not use tools. Test the exact tool/structured-output combination used by each role; do not assume combined features work merely because each is listed.
 - Observed Relace rates: $0.07/M input, $0.50/M output, $0.008/M cached input. Rates can change; use the selected endpoint's rates rather than the model page's lowest-provider headline. Recheck at implementation. Cache hits are not guaranteed.
-- The model listing defaults to high reasoning. Explicitly configure effort and output limits per role; start by evaluating low effort for extraction/classification and increase only when a scenario needs it. Include billed reasoning in token/cost budgets and preserve any required reasoning metadata across tool turns through the SDK without publishing it in Discord.
+- The model listing defaults to high reasoning. Explicitly configure effort and output limits per role; use the validated no-reasoning baseline for the bounded Milestone 0 probe and evaluate reasoning/output budgets per role before increasing effort. Preliminary low-effort probes were inconsistent within their small output caps; this is not proof that reasoning is unsupported. Include billed reasoning in token/cost budgets and preserve any required reasoning metadata across tool turns through the SDK without publishing it in Discord.
 - Public endpoint metadata did not supply latency/throughput percentiles. Do not claim the model meets the initial worker deadline until measured. Keep context bounded despite the advertised context window.
 
 Proposed layout, to establish during implementation:
@@ -166,7 +166,7 @@ docs/
 - Verify applicable repository instructions and current API contracts before editing. Keep the original working integrations intact.
 - Select and pin mutually compatible runtime/package versions: TypeScript, discord.js, LangGraph.js and its Postgres checkpointer, the AI SDK/OpenRouter model adapter if compatible, Zod, and a Postgres client. Verify the SDK forwards the Relace-only routing policy and the selected model/endpoint actually supports our required structured output and tool calls.
 - Define a reproducible local startup procedure for the minimal Node worker, both Python APIs and local Postgres, with version-pinned database/container configuration and persistent storage. Verify local health, DB connectivity, migrations and a persisted LangGraph checkpoint. Model credentials are needed for extraction/research; the Python services need no model key or student password. Keep Render/Supabase packaging/deployment as a later task.
-- Complete `.env.example` using placeholders and non-secret defaults. Proposed bot variables: `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID`, `DISCORD_PLANNING_CHANNEL_IDS`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_PROVIDER`, `OPENROUTER_ALLOW_FALLBACKS`, `OPENROUTER_REQUIRE_PARAMETERS`, `DATABASE_URL`, `ASU_API_BASE_URL`, and `RMP_API_BASE_URL`. The OpenRouter defaults document the proposed selection now; the bot configuration loader is still to be implemented. These are bot configuration names, not existing Python-service configuration.
+- Complete `.env.example` using placeholders and non-secret defaults. Proposed bot variables: `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID`, `DISCORD_PLANNING_CHANNEL_IDS`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_PROVIDER`, `OPENROUTER_ALLOW_FALLBACKS`, `OPENROUTER_REQUIRE_PARAMETERS`, `DATABASE_URL`, `ASU_API_BASE_URL`, and `RMP_API_BASE_URL`. The root `.env.example` and `bot/src/config` now implement the shared configuration contract. These are bot configuration names, not existing Python-service configuration.
 - Provide a Developer Portal checklist: create the Ray application/bot, enable the necessary intent, install in a private test server, and grant the selected channel permissions. Configure the Discord display name as Ray; detect invocations using the actual bot identity/mention metadata rather than matching its name in text. Keep credentials out of chat, logs and Git.
 - Adopt [mock chat scenarios](mock-chat-scenarios.md), including four synthetic actors, expected extracted preferences, and the silent-participant progression. Convert them to machine-readable replay fixtures in Milestone 1.
 
@@ -342,10 +342,24 @@ Do not automate ordinary user accounts or pretend webhook/bot messages are disti
 - [x] Committed APIs inspected; 49 offline tests, lint and one live smoke path passed during the earlier review.
 - [x] Current Discord guidance retrieved through Context7 MCP and official references.
 - [x] Detailed milestone plan and readable synthetic conversation prepared.
-- [ ] Milestone 0: local foundation, portable configuration, runtime/model/checkpointer checks and scenarios.
+- [x] Milestone 0: local foundation, portable configuration, runtime/model/checkpointer checks and scenarios. See verification below.
 - [ ] Milestone 1: complete Discord and preference workflow.
 - [ ] Milestone 2: one live catalog path.
 - [ ] Milestone 3: bounded parallel research.
 - [ ] Milestone 4: group recommendations, refinement and expanded complex-workflow mock suite.
 - [ ] Milestone 5: Render/Supabase deployment, configuration parity and demo.
 - [ ] Optional Milestone 6: owned chat UI.
+
+## Milestone 0 verification
+
+Implemented on branch `demo`, October 24, 2026 (America/Phoenix). [Setup and commands](../bot/README.md).
+
+- Pinned Node 24.8.0, TypeScript 7.0.2, discord.js 14.27.0, LangGraph 1.5.2, Postgres checkpointer 1.1.2, AI SDK 7.0.153, OpenRouter provider 3.1.0 and Zod 4.6.7 through exact dependencies and the npm lockfile.
+- Docker Postgres 17.10 on port 55432, persistent volume; versioned app migrations and separate checkpointer schema. Migrations ran twice and a checkpoint was read successfully in a fresh Node process. The existing database on port 5432 was not modified.
+- `npm run dev` started both existing Python APIs and the foundation worker; `npm run doctor` passed both API health checks and database connectivity. No Discord login, commands or group-planning behavior is claimed.
+- Seven offline TypeScript tests validate configuration without secret disclosure, false-valued routing flags, deployed API base prefixes, error/timeout handling, SDK request forwarding/override rejection and explicit production configuration.
+- Live Relace-pinned model probe passed schema-valid author-owned facts, one synthetic tool execution and a schema-valid result across three model calls. Latest default-configuration probe: 2,952 ms total, 546 input tokens, 122 output tokens, no reasoning tokens, with `OPENROUTER_REASONING_EFFORT=none`. This is one capability check, not a quality/latency benchmark.
+- Low-effort preliminary probes were inconsistent within the small output caps; the baseline now explicitly disables reasoning. Per-role reasoning budgets require later tests rather than silent fallback or an increased unbounded output budget.
+- TypeScript build, existing 49 Python tests and Python lint passed. No secret values, raw reasoning, live review comments or syllabus files are stored in the verification record.
+
+Stop before Milestone 1. Discord credentials/setup and real Discord interaction checks belong to that next milestone.

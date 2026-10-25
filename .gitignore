@@ -12,3 +12,6 @@ htmlcov/
 .DS_Store
 *.log
 output/
+node_modules/
+bot/dist/
+.local/

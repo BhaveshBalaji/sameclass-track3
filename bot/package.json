@@ -1,0 +1,35 @@
+{
+  "name": "ray-discord-bot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.8.0 <25"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "start": "node dist/src/worker.js",
+    "doctor": "tsx scripts/doctor.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "check:db": "tsx scripts/check-db.ts",
+    "check:model": "tsx scripts/check-model.ts"
+  },
+  "dependencies": {
+    "@langchain/langgraph": "1.5.2",
+    "@langchain/langgraph-checkpoint-postgres": "1.1.2",
+    "@openrouter/ai-sdk-provider": "3.1.0",
+    "ai": "7.0.153",
+    "discord.js": "14.27.0",
+    "dotenv": "18.0.9",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}

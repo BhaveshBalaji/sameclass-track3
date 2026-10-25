@@ -11,7 +11,7 @@ This repository contains the course-research backend for SameClass: two independ
 
 ## Bot implementation plan
 
-The APIs are implemented; **Ray**, the Discord bot for SameClass, is planned. Start with the [canonical milestone checklist](docs/discord-bot-milestones.md), consult the [workflow and architecture](docs/workflow-architecture.md) while implementing, and use the [mock chat scenarios](docs/mock-chat-scenarios.md) for testing. The [integration validation](docs/integration-validation.md) records API capabilities and limitations the bot must handle.
+The APIs and **Ray**'s Milestone 0 local foundation are implemented; the Discord interaction workflow starts in Milestone 1. See the [bot setup guide](bot/README.md) for one-command local startup and validation. Start with the [canonical milestone checklist](docs/discord-bot-milestones.md), consult the [workflow and architecture](docs/workflow-architecture.md) while implementing, and use the [mock chat scenarios](docs/mock-chat-scenarios.md) for testing. The [integration validation](docs/integration-validation.md) records API capabilities and limitations the bot must handle.
 
 ## Start both services
 

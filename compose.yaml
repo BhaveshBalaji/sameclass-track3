@@ -1,0 +1,19 @@
+name: ray-track3
+services:
+  postgres:
+    image: postgres:17.10-bookworm
+    environment:
+      POSTGRES_DB: ray
+      POSTGRES_USER: ray
+      POSTGRES_PASSWORD: ray_local_only
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - ray_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ray -d ray"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+volumes:
+  ray_postgres:

@@ -1,0 +1,24 @@
+{
+  "name": "ray-track3",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "bot"
+  ],
+  "engines": {
+    "node": ">=24.8.0 <25"
+  },
+  "scripts": {
+    "build": "npm run build --workspace bot",
+    "typecheck": "npm run typecheck --workspace bot",
+    "test": "npm run test --workspace bot",
+    "dev": "node scripts/dev.mjs",
+    "doctor": "npm run doctor --workspace bot",
+    "db:migrate": "npm run db:migrate --workspace bot",
+    "check:db": "npm run check:db --workspace bot",
+    "check:model": "npm run check:model --workspace bot",
+    "db:up": "node scripts/database.mjs up",
+    "db:stop": "node scripts/database.mjs down"
+  }
+}

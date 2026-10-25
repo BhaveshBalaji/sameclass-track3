@@ -1,6 +1,6 @@
 # Ray workflow and architecture
 
-Status: the team accepted the recommended direction on October 24, 2026. Use [Discord bot milestones](discord-bot-milestones.md) as the canonical build checklist. This document explains the architecture; it does not report implemented bot functionality.
+Status: the team accepted the recommended direction on October 24, 2026. Use [Discord bot milestones](discord-bot-milestones.md) as the canonical build checklist. This document explains the architecture. Milestone 0 local configuration/persistence/startup is implemented; Discord interaction behavior starts in Milestone 1.
 
 ## Product workflow
 
