@@ -1,6 +1,6 @@
 # Ray Discord bot: implementation milestones
 
-Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestones 0 and 1 are complete: local foundation, Discord preference intake, replay verification, and the user-confirmed private-server smoke test. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
+Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestones 0 and 1 are complete. Milestone 2 implementation and live API checks are in place; its real Discord answer verification is pending. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
 
 ## 1. Agreed scope
 
@@ -227,6 +227,8 @@ This is the original brief's first implementation milestone. Use the following s
 **Build**
 
 - Add typed clients for the committed catalog API. Resolve the selected semester/course and consume normalized sections with source IDs and retrieval timestamps.
+- Use readable semester names and autocomplete for `/plan start semester:Spring 2027`; keep ASU numeric codes internal and preserve existing sessions.
+- Keep replies focused: omit public progress/processed messages and internal snapshot/profile versions; use native typing/deferred interactions. Retain a brief processing notice, relevant source limitations and errors. Suppress routine heartbeat/API access logs.
 - Answer “Who teaches CSE 512 in our selected semester, and what is the listed availability?” If the live source has no listing, report that accurately and use another real listed course for a positive smoke check.
 - Render instructors, section identifiers, meeting information where available, nullable seats, ASU source links, coverage and timestamps. Clearly distinguish observations from eligibility or reservation.
 - Keep syllabus/review research out of this narrow path. A seat-count request must not fan out to unrelated agents.
@@ -344,7 +346,7 @@ Do not automate ordinary user accounts or pretend webhook/bot messages are disti
 - [x] Detailed milestone plan and readable synthetic conversation prepared.
 - [x] Milestone 0: local foundation, portable configuration, runtime/model/checkpointer checks and scenarios. See verification below.
 - [x] Milestone 1: Discord preference workflow, replay checks, user-confirmed live smoke test and restart persistence.
-- [ ] Milestone 2: one live catalog path.
+- [ ] Milestone 2: implemented; Discord answer verification pending. Original scope: one live catalog path.
 - [ ] Milestone 3: bounded parallel research.
 - [ ] Milestone 4: group recommendations, refinement and expanded complex-workflow mock suite.
 - [ ] Milestone 5: Render/Supabase deployment, configuration parity and demo.
@@ -371,3 +373,11 @@ Implemented on `demo`: Gateway intake, guild/channel allowlisting, `/ping`, `/as
 The fixture replay uses four synthetic students in a separate `ray_m1_test` database. Offline checks and database regression tests cover wrong-author replies, duplicate events, stale work, resets, delivery uncertainty and cancelled participation questions. The live OpenRouter/DeepSeek/Relace replay passed author isolation, hard/soft facts, explicit flexibility, silent-participant replies and correction retention. Synthetic fixtures are opt-in test inputs, never a product fallback. The extraction prompt was clarified after the initial live replay omitted facts; broader model regression scenarios remain Milestone 4.
 
 Discord commands were registered and the Gateway connected successfully to the configured test server/channel. The user reported “Everything worked” for the requested `/ping`, start/join, actual mention, summary and conditional clarification-reply smoke workflow. Database metadata confirmed an active joined participant with extracted facts. After that confirmation, the worker was stopped and restarted: the Gateway reconnected, and a comparison of the complete persisted session state before/after restart matched exactly. No student content or credentials were included in these verification notes. Milestone 1 is complete. Course, syllabus and RMP answers intentionally remain disconnected here. Stop before Milestone 2.
+
+## Milestone 2 verification
+
+Implemented on `demo`: typed catalog adapter, exact course/semester identity validation, a bounded two-page all-status search, deterministic answer rendering, source/section links, unknown seat/meeting handling, retrieval timestamps and explicit coverage. `/ask` and explicit catalog mentions work without joining and do not modify the roster or profiles. No LLM, RMP or syllabus calls are used on this narrow catalog path. Missing or ambiguous courses/semesters prompt clarification. Semester autocomplete and replies use names; existing stored ASU codes remain valid. Routine chatter and internal version labels were removed, including public progress messages, redundant processed acknowledgements and repeating heartbeat/API access logs.
+
+Live Spring 2027 API checks: CSE 512 returned zero listings with complete/exhausted coverage. CSE 575 returned two sections with complete coverage: 14703 (Yingzhen Yang) and 20755 (Samira Ghayekhloo). The first had scheduled Monday/Wednesday meetings; the second had no listed meeting times, which remained unknown. Seat counts are only timestamped observations. These are real API results, not fixture fallback data.
+
+The TypeScript build, 16 offline tests, 10 database integration tests and deterministic replay passed. Contract/state tests cover readable semester mapping and ambiguity, base-path preservation, source identity mismatch, unknown/zero seats, absent instructors/times, incomplete/empty searches, source failure and nonparticipant question isolation/deduplication. The deterministic four-student preference replay remains intact. Real Discord rendering/semester-picker verification is pending the user's requested smoke check. Stop before Milestone 3.

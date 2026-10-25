@@ -4,6 +4,12 @@ import type pg from 'pg';
 import { PlanningApplication } from '../src/application/planning.js';
 import { PlanningStore } from '../src/persistence/planning-store.js';
 import { fixture, fixtureLanguage, testDatabase, harness, baseScenario, continueScenario, cleanup, type Fixture } from '../scripts/replay-support.js';
+import { CatalogResearch } from '../src/application/catalog.js';
+import { CatalogClient } from '../src/integrations/catalog.js';
+import { APIClient } from '../src/integrations/api.js';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { repoRoot } from '../src/config/index.js';
 import type { LanguageService, Patch } from '../src/domain/planning.js';
 let pool: pg.Pool, data: Fixture;
 const namespaces: string[] = [];
@@ -65,7 +71,7 @@ test('a newer message invalidates an in-flight result without losing the newer c
   const state = (await h.store.read(h.room))!;
   assert.equal(Object.keys(state.participants['test:maya']!.profile.facts).length,0);
   assert.ok(state.messages.some(m => m.id === 'newer'));
-  assert.ok(h.delivered.some(m => /older results/.test(m.text)));
+  assert.ok(h.delivered.some(m => /updated summary/.test(m.text)));
 });
 test('standalone ask never joins a session or changes stored profiles', async () => {
   const h = setup(); await baseScenario(h,data);
@@ -126,4 +132,28 @@ test('a stale undelivered participation question does not permanently suppress t
   const state = (await h.store.read(h.room))!;
   assert.equal(state.clarifications.filter(q => q.userId === 'test:dev' && q.field === 'participation').length,1);
   assert.ok(state.clarifications.find(q => q.userId === 'test:dev')!.messageIds.length);
+});
+
+test('catalog slash and mention questions by a nonparticipant are deduplicated and do not change session/profile state', async () => {
+  const h = setup(); await baseScenario(h,data);
+  let sourceCalls=0;
+  const catalog=JSON.parse(await readFile(join(repoRoot,'class_search_api/example_response.json'),'utf8'));
+  const research=new CatalogResearch(new CatalogClient(new APIClient('https://backend.test/asu',1000,async () => {
+    sourceCalls++;return Response.json(catalog);
+  })));
+  const language:LanguageService={async classify(){throw Error('Catalog questions should not call an LLM');},async extract(){throw Error('No extraction');}};
+  const app=new PlanningApplication(h.store,language,undefined,research);
+  const before=await h.store.read(h.room),actor={userId:'test:outsider',name:'Visitor'};
+  await app.ask(h.room,'catalog-ask',actor,'Who teaches CSE 575 in Spring 2027?'); await h.drain();
+  await app.ask(h.room,'catalog-ask',actor,'Who teaches CSE 575 in Spring 2027?'); await h.drain();
+  assert.equal(sourceCalls,1);assert.match(h.delivered.at(-1)!.text,/Example Instructor/);
+  await app.message({...h.room,...actor,id:'catalog-mention',botMention:true,content:'Who teaches CSE 575 and are there seats?'});await h.drain();
+  assert.equal(sourceCalls,2);assert.deepEqual(await h.store.read(h.room),before);
+});
+test('a readable semester is stored as a code but all planning output uses its name',async()=>{
+  const h=setup();await h.app.start(h.room,'readable',data.actors[0]!,'Spring 2027');await h.drain();
+  assert.equal((await h.store.read(h.room))!.term,'2271');
+  assert.match(h.delivered[0]!.text,/Spring 2027/);assert.doesNotMatch(h.delivered[0]!.text,/2271|snapshot|Milestone/);
+  await h.app.status(h.room,'status');await h.drain();
+  assert.doesNotMatch(h.delivered.at(-1)!.text,/snapshot v|profile v|not connected/);
 });

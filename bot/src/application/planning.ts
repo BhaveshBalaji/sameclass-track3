@@ -1,3 +1,5 @@
+import { semesterCode, semesterName } from '../domain/semester.js';
+import { isCourseQuestion, type CourseResearch } from './catalog.js';
 import { randomUUID } from 'node:crypto';
 import { END, START, StateGraph, StateSchema } from '@langchain/langgraph';
 import { z } from 'zod';
@@ -6,8 +8,8 @@ import { PlanningStore, response } from '../persistence/planning-store.js';
 import { PlanningError, clean, missingQuestion, validatePatch, type Actor, type Incoming, type LanguageService,
   type Outgoing, type Participant, type PlanningSession, type Room, type Patch } from '../domain/planning.js';
 
-export const processingNotice = 'Ray uses the configured OpenRouter model provider to process planning messages posted after you join. '
-  + 'Join only if you want your messages included. Course research is not connected in Milestone 1.';
+export const processingNotice = 'Ray sends planning messages posted after you join to OpenRouter to understand your preferences. '
+  + 'Join to include your messages; leave to stop.';
 function requireSession(state: PlanningSession | null): PlanningSession {
   if (!state) throw new PlanningError('Start a planning session with /plan start first.');
   return state;
@@ -16,23 +18,24 @@ function summary(session: PlanningSession): string {
   const people = Object.values(session.participants).filter(p => p.active);
   const sections = people.map(person => {
     const facts = Object.values(person.profile.facts);
-    return `${clean(person.name)}${facts.length ? ` (profile v${person.profile.version})` : ' — preferences unknown'}\n`
+    return `${clean(person.name)}${facts.length ? '' : ' — preferences unknown'}\n`
       + facts.map(f => `• ${f.field.replace(/_/g,' ')} [${f.strength}]: ${clean(f.values.join('; ').slice(0,300))}`).join('\n');
   });
-  return `Planning ${session.term} · ${people.length} joined · snapshot v${session.version}\n\n${sections.join('\n\n')}\n\n`
+  return `Planning ${semesterName(session.term)} · ${people.length} joined\n\n${sections.join('\n\n')}\n\n`
     + (session.truncated ? 'Older conversation context was truncated; saved profile facts are retained.\n' : '')
-    + 'This is a preference summary, not a course recommendation. Live course research is not connected yet.';
+    + 'Mention me with a course to check its instructors, meeting times and seats.';
 }
 export class PlanningApplication {
   constructor(readonly store: PlanningStore, private language: LanguageService,
-    private limits = { messages: 100, characters: 30000, participants: 12 }) {}
+    private limits = { messages: 100, characters: 30000, participants: 12 },
+    private research?: CourseResearch) {}
   async start(room: Room, eventId: string, actor: Actor, term: string): Promise<void> {
-    if (!/^\d{3}[147]$/.test(term)) throw new PlanningError('Use an ASU term code such as 2271.');
+    term = semesterCode(term);
     await this.store.transact(room,eventId,async tx => {
       if (tx.state) throw new PlanningError('A session is already active in this channel.');
       tx.state = { id: randomUUID(), guildId: room.guildId, channelId: room.channelId, creatorId: actor.userId,
         term, version: 1, participants: {}, messages: [], nextOrdinal: 0, truncated: false, clarifications: [] };
-      const body = response(`Planning for ${term}. ${processingNotice}`);
+      const body = response(`Planning for ${semesterName(term)}. ${processingNotice}`);
       body.buttons = ['join','leave'].map(action => ({ label: action === 'join' ? 'Join planning' : 'Leave planning',
         action: action as 'join' | 'leave', sessionId: tx.state!.id }));
       await tx.enqueue(body);
@@ -53,7 +56,7 @@ export class PlanningApplication {
         state.clarifications = state.clarifications.filter(q => q.userId !== actor.userId);
       }
       state.version++; delete state.currentRequest;
-      await tx.enqueue(response(join ? `Joined. ${processingNotice}` : 'You have left planning; your future messages will not be included.',[actor.userId]));
+      await tx.enqueue(response(join ? 'You joined planning.' : 'You have left planning; your future messages will not be included.',[actor.userId]));
     });
   }
   async status(room: Room, eventId: string): Promise<void> {
@@ -103,14 +106,26 @@ export class PlanningApplication {
     });
   }
   async ask(room: Room, eventId: string, actor: Actor, question: string): Promise<void> {
-    await this.store.transact(room,eventId,async tx => {
-      await tx.enqueue(response(`You asked: ${clean(question.slice(0,1000))}\n\nCourse, syllabus and professor research is not connected yet. `
-        + (tx.state ? `The active planning term is ${tx.state.term}.` : 'Include a semester when asking a future research question.')
-        + ' This question does not change your profile or join you to planning.',[actor.userId]));
+    const claimed = await this.store.transact(room,eventId,async tx => ({ term:tx.state?.term }));
+    if (claimed.duplicate) return;
+    const text = await this.answerCourse(question,claimed.value?.term);
+    await this.store.transact(room,`answer:${eventId}`,async tx => {
+      await tx.enqueue(response(text,[actor.userId]));
     });
+  }
+  private answerCourse(question:string,term?:string):Promise<string> {
+    return this.research ? this.research.answer(question,term)
+      : Promise.resolve('Course research is not connected in this test environment.');
   }
   async message(event: Incoming): Promise<void> {
     if (event.bot || event.webhook) return;
+    if (event.botMention) {
+      const session = await this.store.read(event);
+      const direct = session?.clarifications.some(q => q.state === 'pending' && q.userId === event.userId && q.messageIds.includes(event.replyTo ?? ''));
+      if (!direct && (isCourseQuestion(event.content) || !session)) {
+        await this.ask(event,event.id,event,event.content); return;
+      }
+    }
     const claimed = await this.store.transact(event,event.id,async tx => {
       const state = tx.state, participant = state?.participants[event.userId];
       const pending = state?.clarifications.find(q => q.state === 'pending' && q.userId === event.userId && q.messageIds.includes(event.replyTo ?? ''));
@@ -123,7 +138,7 @@ export class PlanningApplication {
         state.version++;
       }
       if (!event.botMention && !pending) return;
-      if (!state) { await tx.enqueue(response('Course and syllabus research is not connected yet. You can ask without joining; include a semester for future research. Use /plan start for group planning.',[event.userId])); return; }
+      if (!state) { await tx.enqueue(response('This planning session has ended. Use /ask with a course and semester, or /plan start to begin planning.',[event.userId])); return; }
       const requestId = randomUUID(); state.currentRequest = requestId;
       return { requestId, snapshot: structuredClone(state), pendingId: pending?.id, participant: participant?.active ?? false };
     });
@@ -158,17 +173,19 @@ export class PlanningApplication {
     let modelFailed = false;
     try { await graph.invoke({ requestId: work.requestId, status: 'started' }, { configurable: { thread_id: `m1:${this.store.namespace}:${work.requestId}` } }); }
     catch { modelFailed = true; }
+    const courseAnswer = !modelFailed && (intent as string) === 'course_question'
+      ? await this.answerCourse(event.content,work.snapshot.term) : undefined;
     await this.store.transact(event,`finish:${work.requestId}`,async tx => {
       const state = tx.state;
       if (!state || state.id !== work.snapshot.id) return;
       if (state.version !== work.snapshot.version || state.currentRequest !== work.requestId) {
-        await tx.enqueue(response('New planning messages or another request arrived. Mention Ray again to refresh; older results have not overwritten your current preferences.',[event.userId])); return;
+        await tx.enqueue(response('New messages arrived while I was working. Mention me again for an updated summary.',[event.userId])); return;
       }
       delete state.currentRequest;
       if (modelFailed) { await tx.enqueue(response('I could not validate the model response. Your preferences were not changed; please try again.',[event.userId])); return; }
       if (intent === 'course_question') {
         const message = state.messages.find(m => m.id === event.id); if (message) message.ignored = true;
-        await tx.enqueue(response('Course, syllabus and professor research is not connected yet. This question has not changed any profile or selected courses.',[event.userId])); return;
+        await tx.enqueue(response(courseAnswer ?? 'Please include a course and semester.',[event.userId])); return;
       }
       if (!work.participant) { await tx.enqueue(response('Join planning before requesting a group preference summary. You can use /ask without joining.',[event.userId])); return; }
       for (const item of patches) {

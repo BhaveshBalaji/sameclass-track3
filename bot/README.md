@@ -1,6 +1,6 @@
 # Ray · local Discord planning bot
 
-Milestones 0–1 implement local startup, portable configuration, Postgres persistence, and Discord group preference intake through LangGraph and OpenRouter. Ray collects and summarizes separate student profiles. Course, syllabus and professor research is visibly disconnected until later milestones; this version does not recommend sections.
+Milestones 0–2 implement local startup, portable configuration, Postgres persistence, Discord preference intake through LangGraph/OpenRouter, and a narrow live ASU catalog path. Ray can look up instructors, sections, meeting times and seats for a named course and semester. Syllabus/review research and group recommendations come in later milestones.
 
 ## Setup and start
 
@@ -77,16 +77,20 @@ The local supervisor manages only default local API URLs. Configured custom API 
 
 In the configured server text channel:
 
-1. Run `/ping`, then `/plan start term:2271` (Spring 2027).
+1. Run `/ping`, then `/plan start semester:Spring 2027` (use the autocomplete picker).
 2. Each student, including the creator, clicks **Join planning**. A session is a shared workspace in this existing channel. Up to 12 students can join with separate profiles.
 3. Post your requirements naturally. Ordinary messages from joined students are retained but produce no reply or model call.
 4. Mention the actual **@Ray** account to summarize the group. Ray extracts each author's own hard constraints, soft preferences and explicit flexibility, preserving unknowns. A name typed as plain text is not a Discord mention.
 5. Answer a follow-up with Discord's **Reply** action to the bot message; the intended author need not mention Ray again. Silent participants are asked once.
-6. Use `/plan status`, `/plan profile`, `/plan reset-profile` or `/plan reset-session`. Profile/status output appears in the planning channel; command acknowledgements are ephemeral. Session reset requires creator/moderator permission and an actor-bound confirmation valid for five minutes.
+6. Use `/plan status`, `/plan profile`, `/plan reset-profile` or `/plan reset-session`. Profile/status output appears in the planning channel; temporary command acknowledgements disappear after the channel answer is delivered. Mentions use a typing indicator rather than a separate progress message. Session reset requires creator/moderator permission and an actor-bound confirmation valid for five minutes.
 
 **Leave planning** stops future intake. Your own reset removes saved facts and retained source messages; session reset removes all session profiles/context. Resets invalidate in-flight results. Graph checkpoints contain request IDs/status, not student messages or profiles. Already-posted Discord responses remain in channel history.
 
-`/ask question:...` and course-information mentions work without joining, return an explicit research-disconnected notice, and do not modify profiles. Catalog answers start in Milestone 2; syllabus/RMP answers start in Milestone 3.
+`/ask question:Who teaches CSE 575 in Spring 2027, and are there seats?` works without joining. An actual @Ray mention with the same question also works. If a session is active, you can omit the semester; an explicit semester overrides the session for that lookup. A missing year, relative semester or multiple courses/semesters prompts clarification rather than a guess. Questions do not join you or alter profiles.
+
+Catalog questions use one typed class-search API call (up to two source pages, all seat statuses) with deterministic identity checks and rendering. They do not use an LLM or call syllabus/RMP services. Answers include exact section links, instructors, nullable seats, meeting times/timezone, source retrieval time and search coverage. Up to eight returned sections are displayed, with an ASU link for the rest. An empty complete search is reported as no listings; a partial search or source failure is never proof that no classes exist. Seats are observations, not enrollment guarantees.
+
+Use readable semesters such as **Spring 2027**, **Summer 2027** or **Fall 2027**. The bot stores ASU codes internally to preserve existing sessions. Legacy code inputs still work, but the command picker and replies use names. Syllabus/RMP research starts in Milestone 3. Brief model-processing consent is shown when starting a planning session; internal versions, repeated join disclosures, heartbeat logs and API access logs are omitted from routine output.
 
 Context defaults to 100 messages / 30,000 characters, with individual input capped at 4,000 characters. Configure `PLANNING_MAX_MESSAGES`, `PLANNING_MAX_CHARACTERS` and `PLANNING_MAX_PARTICIPANTS` as needed (12 participants maximum). Saved facts outlive the rolling context and retain up to 12 evidence quotes per field. Displayed fact values are abbreviated. A newer message arriving during extraction invalidates the older snapshot; mention Ray again to refresh.
 
@@ -95,7 +99,7 @@ Gateway buttons, profiles and pending clarification references persist through r
 ## Synthetic replay and verification
 
 ```bash
-npm test                      # 10 offline foundation/transport-contract checks
+npm test                      # offline foundation, semester and catalog-contract checks
 npm run test:planning         # real Postgres state and delivery regression tests
 npm run replay                # deterministic four-student application replay
 npm run replay -- --live      # opt-in paid OpenRouter replay with synthetic students
@@ -105,4 +109,4 @@ Replay uses the same application handlers as Discord, synthetic identities and a
 
 The [readable four-student scenarios](../docs/mock-chat-scenarios.md) and `bot/test-data/conversations/four-students.json` cover author isolation, a silent participant, direct replies, corrections and question isolation. Milestone 4 expands this suite to complex workflows and evidence failures.
 
-The live synthetic OpenRouter replay passed, and the user confirmed the requested private-server smoke workflow worked. A subsequent worker restart reconnected the Gateway and preserved the live session state exactly. Milestone 1 is complete; course research remains disconnected.
+The live synthetic OpenRouter replay passed, and the user confirmed the requested private-server smoke workflow worked. A subsequent worker restart reconnected the Gateway and preserved the live session state exactly. Milestone 1 is complete. Milestone 2 live API checks returned no CSE 512 Spring 2027 listings and two CSE 575 sections; real Discord answer verification is pending.

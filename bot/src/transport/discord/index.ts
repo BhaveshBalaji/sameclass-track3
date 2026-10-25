@@ -1,3 +1,4 @@
+import { semesterChoices } from '../../domain/semester.js';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, Events, GatewayIntentBits,
@@ -34,6 +35,10 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
     if (!delivered) throw new Error('Discord delivery could not be confirmed.');
   }
   async function onInteraction(interaction: Interaction) {
+    if (interaction.isAutocomplete()) {
+      await interaction.respond(permitted(interaction.guildId,interaction.channelId)
+        ? semesterChoices(interaction.options.getFocused()) : []); return;
+    }
     if (!interaction.isChatInputCommand() && !interaction.isButton()) return;
     if (!permitted(interaction.guildId,interaction.channelId)) {
       await interaction.reply({ content: 'Use Ray in a configured planning channel.', flags: MessageFlags.Ephemeral, allowedMentions: allowedMentions([]) }); return;
@@ -46,13 +51,13 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
     try {
       if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'ping') {
-          await interaction.editReply({ content: 'Ray is connected. Course research is not connected yet.', allowedMentions: allowedMentions([]) }); return;
+          await interaction.editReply({ content: 'Ray is online.', allowedMentions: allowedMentions([]) }); return;
         }
         if (interaction.commandName === 'ask') {
           await app.ask(room,interaction.id,actor,interaction.options.getString('question',true));
         } else if (interaction.commandName === 'plan') {
           switch (interaction.options.getSubcommand()) {
-            case 'start': await app.start(room,interaction.id,actor,interaction.options.getString('term',true)); break;
+            case 'start': await app.start(room,interaction.id,actor,interaction.options.getString('semester',true)); break;
             case 'status': await app.status(room,interaction.id); break;
             case 'profile': await app.profile(room,interaction.id,actor); break;
             case 'reset-profile': await app.resetProfile(room,interaction.id,actor); break;
@@ -67,7 +72,7 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
         else throw new Error('Unknown planning control.');
       }
       await deliver(room);
-      await interaction.editReply({ content: 'Processed. See the response in this planning channel.', allowedMentions: allowedMentions([]) });
+      await interaction.deleteReply();
     } catch (error) {
       // Domain messages have no credentials/model payload. Other failures get a generic diagnostic.
       const detail = error instanceof PlanningError ? error.message : 'Could not process this action. Please retry or check /plan status.';
@@ -81,7 +86,7 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
     const current = await app.store.read(room);
     const direct = current?.clarifications.some(q => q.state === 'pending' && q.userId === message.author.id && q.messageIds.includes(message.reference?.messageId ?? ''));
     if (mentioned || direct) {
-      await message.channel.send({ content: 'Checking your planning preferences…', allowedMentions: allowedMentions([]) });
+      await message.channel.sendTyping().catch(() => {});
     }
     await app.message({ ...room, id: message.id, userId: message.author.id, name: message.member?.displayName ?? message.author.displayName,
       content: message.content, botMention: mentioned, replyTo: message.reference?.messageId });
@@ -105,6 +110,5 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
     }
   } catch (error) { client.destroy(); throw error; }
   finally { clearTimeout(timeout); readiness.abort(); }
-  console.log(JSON.stringify({ service: 'Ray', milestone: 1, status: 'connected', channels: settings.channels.size }));
   return client;
 }

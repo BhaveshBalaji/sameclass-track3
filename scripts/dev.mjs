@@ -45,7 +45,7 @@ try {
   const asu = process.env.ASU_API_BASE_URL || 'http://127.0.0.1:8000';
   const rmp = process.env.RMP_API_BASE_URL || 'http://127.0.0.1:8001';
   for (const [base, app, port] of [[asu, 'class_search_api.server:app', '8000'], [rmp, 'rmp_api.server:app', '8001']]) {
-    if (base === `http://127.0.0.1:${port}`) run(python, ['-m', 'uvicorn', app, '--host', '127.0.0.1', '--port', port]);
+    if (base === `http://127.0.0.1:${port}`) run(python, ['-m', 'uvicorn', app, '--host', '127.0.0.1', '--port', port, '--no-access-log', '--log-level', 'warning']);
   }
   await Promise.all([ready(asu), ready(rmp)]);
   if (!stopping) run(process.execPath, ['--import', 'tsx', 'bot/src/worker.ts']);

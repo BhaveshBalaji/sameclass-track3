@@ -3,6 +3,19 @@ import type pg from 'pg';
 import type { Outgoing, PlanningSession, Room } from '../domain/planning.js';
 
 export function roomId(room: Room) { return `${room.guildId}:${room.channelId}`; }
+/** Keep section paragraphs (and their source links) together whenever they fit. */
+export function messageParts(text: string, limit = 1700): string[] {
+  const parts: string[] = [];
+  let current = '';
+  for (const paragraph of text.split('\n\n')) {
+    if (current && current.length + 2 + paragraph.length > limit) { parts.push(current); current = ''; }
+    let remaining = paragraph;
+    while (remaining.length > limit) { parts.push(remaining.slice(0,limit)); remaining = remaining.slice(limit); }
+    current = current ? `${current}\n\n${remaining}` : remaining;
+  }
+  if (current || !parts.length) parts.push(current);
+  return parts;
+}
 export interface Transaction {
   state: PlanningSession | null;
   enqueue(response: Outgoing, guarded?: boolean): Promise<void>;
@@ -66,7 +79,7 @@ export class PlanningStore {
           if (row.session_id && session?.id !== row.session_id) {
             await client.query("UPDATE ray_app.planning_outbox SET status='cancelled' WHERE id=$1", [id]); body = undefined;
           } else if (row.snapshot_version !== null && session?.version !== Number(row.snapshot_version)) {
-            body = { id, text: 'New planning messages arrived. Mention Ray again to refresh; the older snapshot has not overwritten newer preferences.', mentions: [], clarificationIds: [] };
+            body = { id, text: 'New messages arrived while I was working. Mention me again for an updated summary.', mentions: [], clarificationIds: [] };
             if (session) {
               const removed = session.clarifications.filter(q => q.responseId === id);
               session.clarifications = session.clarifications.filter(q => q.responseId !== id);
@@ -85,7 +98,7 @@ export class PlanningStore {
       const messageIds: string[] = [];
       try {
         // Small parts leave room for actual transport mentions, below Discord's 2000-char cap.
-        const parts = body.text.match(/[\s\S]{1,1700}/g) ?? [''];
+        const parts = messageParts(body.text);
         for (const [part, content] of parts.entries()) {
           const externalId = await send(body,part,content); messageIds.push(externalId);
           await this.pool.query('UPDATE ray_app.planning_outbox SET deliveries=$2 WHERE id=$1', [id,JSON.stringify(messageIds)]);

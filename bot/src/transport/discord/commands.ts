@@ -7,7 +7,7 @@ export const commandDefinitions = [
     .addStringOption(o => o.setName('question').setDescription('Your course/syllabus question').setRequired(true).setMaxLength(1000)),
   new SlashCommandBuilder().setName('plan').setDescription('Manage a shared class-planning session.')
     .addSubcommand(c => c.setName('start').setDescription('Create a planning workspace in this channel.')
-      .addStringOption(o => o.setName('term').setDescription('ASU term code, e.g. 2271').setRequired(true).setMinLength(4).setMaxLength(4)))
+      .addStringOption(o => o.setName('semester').setDescription('Semester, e.g. Spring 2027').setRequired(true).setAutocomplete(true).setMaxLength(40)))
     .addSubcommand(c => c.setName('status').setDescription('Show current participants and saved preferences.'))
     .addSubcommand(c => c.setName('profile').setDescription('Show your stored planning preferences.'))
     .addSubcommand(c => c.setName('reset-profile').setDescription('Remove your stored profile and source messages.'))

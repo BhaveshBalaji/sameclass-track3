@@ -11,7 +11,7 @@ This repository contains the course-research backend for SameClass: two independ
 
 ## Bot implementation plan
 
-The APIs, **Ray**'s local foundation, and the Milestone 1 Discord preference workflow are implemented. The user confirmed the private-server smoke test passed, and session state survived a worker restart. Course research remains disconnected from Ray until Milestone 2. See the [bot setup guide](bot/README.md) for one-command local startup and validation. Start with the [canonical milestone checklist](docs/discord-bot-milestones.md), consult the [workflow and architecture](docs/workflow-architecture.md) while implementing, and use the [mock chat scenarios](docs/mock-chat-scenarios.md) for testing. The [integration validation](docs/integration-validation.md) records API capabilities and limitations the bot must handle.
+The APIs, **Ray**'s local foundation, and the Milestone 1 Discord preference workflow are implemented. The user confirmed the private-server smoke test passed, and session state survived a worker restart. Milestone 2 adds live instructor, meeting-time and seat lookups, readable semester names and quieter Discord replies. Its real-server answer check is pending. See the [bot setup guide](bot/README.md) for one-command local startup and validation. Start with the [canonical milestone checklist](docs/discord-bot-milestones.md), consult the [workflow and architecture](docs/workflow-architecture.md) while implementing, and use the [mock chat scenarios](docs/mock-chat-scenarios.md) for testing. The [integration validation](docs/integration-validation.md) records API capabilities and limitations the bot must handle.
 
 ## Start both services
 
