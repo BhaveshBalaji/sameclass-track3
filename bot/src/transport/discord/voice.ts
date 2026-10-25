@@ -1,5 +1,5 @@
 import { PassThrough } from 'node:stream';
-import { createAudioPlayer, createAudioResource, entersState, EndBehaviorType, joinVoiceChannel,
+import { AudioPlayerStatus, createAudioPlayer, createAudioResource, entersState, EndBehaviorType, joinVoiceChannel,
   NoSubscriberBehavior, StreamType, VoiceConnectionStatus, type VoiceConnection } from '@discordjs/voice';
 import { ChannelType, PermissionFlagsBits, type Client, type ChatInputCommandInteraction, type Message } from 'discord.js';
 import type { Config } from '../../config/index.js';
@@ -88,7 +88,7 @@ export class DiscordVoice {
     const stop = () => { const live = this.live; live?.stream?.destroy(); if (live) live.stream=undefined; player.stop(true); };
     const session = new VoiceSession(this.config,this.backend(room,sessionId),{
       stop,status,
-      finish:()=>this.live?.stream?.end(),
+      finish:()=>{if(this.live?.stream)this.live.stream.end();else status('listening');},
       audio:(pcm,rate)=>{
         const live=this.live;if(!live)return;
         if(!live.stream){
@@ -102,6 +102,9 @@ export class DiscordVoice {
     const timer=setTimeout(()=>this.close(),this.config.VOICE_MAX_DURATION_SECONDS*1000);
     this.live={room,sessionId,ownerId,connection,session,player,captures,timer};
     player.on('error',()=>{session.interrupt();status('Audio playback failed. Ask Ray again.');});
+    player.on(AudioPlayerStatus.Idle,()=>{
+      if(this.live?.stream?.writableEnded){this.live.stream=undefined;status('listening');}
+    });
     connection.on('error',()=>this.close());
     connection.on(VoiceConnectionStatus.Disconnected,()=>this.close());
     connection.receiver.speaking.on('start',userId=>{void this.capture(userId).catch(()=>status('Could not hear that turn. Please try again.'));});
@@ -153,6 +156,7 @@ export class DiscordVoice {
     live.captures.get(userId)?.();live.session.leave(userId);
     if(!live.session.participants.size)this.close();
   }
+  clearContext():void{this.stopCaptures();this.live?.session.clearContext();}
   private stopCaptures():void{for(const close of [...this.live?.captures.values()??[]])close();}
   close():void{
     const live=this.live;if(!live)return;

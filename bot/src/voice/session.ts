@@ -6,7 +6,7 @@ import { ElevenAgent, type AgentCallbacks, type VoiceToolCall } from './elevenla
 export interface VoiceBackend {
   authorized(actor: Actor): Promise<boolean>;
   intake(actor: Actor, sourceId: string, text: string): Promise<void>;
-  tool(actor: Actor, call: VoiceToolCall, signal: AbortSignal): Promise<unknown>;
+  tool(actor: Actor, call: VoiceToolCall, signal: AbortSignal, utterance: string): Promise<unknown>;
 }
 export interface VoiceOutput {
   audio(pcm: Buffer, rate: number): void;
@@ -46,6 +46,7 @@ export class VoiceSession {
   pause(): void { this.paused = true; this.followup = undefined; this.interrupt(); this.output.status('paused'); }
   resume(): void { if (this.closed) return; this.paused = false; this.output.status('listening'); }
   close(): void { if (this.closed) return; this.closed = true; this.interrupt(); this.participants.clear(); this.history = []; this.output.status('disconnected'); }
+  clearContext(): void { this.interrupt();this.history=[];this.followup=undefined; }
 
   async transcript(userId: string, text: string): Promise<void> {
     const actor = this.participants.get(userId);
@@ -71,13 +72,13 @@ export class VoiceSession {
       text: answer => { if (current()) this.remember(userId, `Ray: ${answer}`); },
       tool: async (call, signal) => {
         if (!current() || !await this.backend.authorized(actor)) throw new Error('Voice request expired.');
-        const result = await this.backend.tool(actor, call, signal);
+        const result = await this.backend.tool(actor, call, signal, text);
         if (!current() || !await this.backend.authorized(actor)) throw new Error('Voice request expired.');
         return result;
       },
       complete: () => {
         if (!current()) return;
-        this.output.finish(); this.output.status('listening');
+        this.output.finish(); this.agent?.close(); this.agent=undefined;
         this.followup = { userId, until: this.now() + this.config.VOICE_FOLLOWUP_SECONDS * 1000 };
       },
       failed: () => { if (current()) { this.interrupt(); this.output.status('Voice connection failed. Ask Ray again or use /ask in text.'); } },

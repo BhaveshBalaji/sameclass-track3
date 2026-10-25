@@ -86,7 +86,7 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
             case 'recommend': await app.recommend(room,interaction.id,actor); break;
             case 'status': await app.status(room,interaction.id); break;
             case 'profile': await app.profile(room,interaction.id,actor); break;
-            case 'reset-profile': await app.resetProfile(room,interaction.id,actor); break;
+            case 'reset-profile': await app.resetProfile(room,interaction.id,actor); voice.clearContext(); break;
             case 'reset-session': await app.requestReset(room,interaction.id,actor); break;
           }
         } else { await interaction.editReply('This command is not handled by Ray.'); return; }

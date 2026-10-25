@@ -8,6 +8,9 @@
   "recordVoice": false,
   "transcriptRetentionDays": 1,
   "tools": {
-    "research_course": "tool_6501m5schdy4e5s9f24gzgfbvyc5"
+    "research_course": "tool_6501m5schdy4e5s9f24gzgfbvyc5",
+    "get_my_notes": "tool_1401m5scy7r0efkaeskkhctvg7ek",
+    "recommend_group": "tool_6301m5scy8yje3rae1th15y6j8pp",
+    "session_recap": "tool_6201m5scya12ej7tcs5dsv92etwz"
   }
 }

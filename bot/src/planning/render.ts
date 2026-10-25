@@ -73,5 +73,12 @@ export function renderPlan(session:PlanningSession,schedule:GroupSchedule,ranked
   if(notes.some(n=>/lookup failed/.test(n)))text+=' A catalog lookup failed; other results were retained.';
   if(schedule.bounded||notes.length)text+=' Search/research was bounded; more options may exist.';
   if(selected.some(c=>c.research?.limitations.length))text+=' Some sources could not be retrieved.';
-  return {text,sectionIds:selected.map(c=>c.section.class_nbr),inlineMentions,assignments:schedule.students.map(s=>({userId:s.userId,requested:s.requested,sectionIds:s.candidates.map(c=>c.section.class_nbr)}))};
+  const spoken={members:schedule.students.map(student=>({name:session.participants[student.userId]!.name,requested:student.requested,
+    choices:student.candidates.map(c=>({course:`${c.section.subject} ${c.section.catalog_nbr}`,section:c.section.class_nbr,
+      instructors:c.section.instructors.map(i=>i.name),meetings:meetings(c),
+      reasons:c.fits.find(f=>f.userId===student.userId)!.softEvidence.slice(0,2),
+      unchecked:[...c.fits.find(f=>f.userId===student.userId)!.unchecked,...(!c.bundleVerified?['Required lab/recitation rules unchecked']:[])]}))})),
+    shared:shared.map(c=>({course:`${c.section.subject} ${c.section.catalog_nbr}`,names:schedule.students.filter(s=>s.candidates.includes(c)).map(s=>session.participants[s.userId]!.name),preliminary:!c.bundleVerified})),
+    limitations:['Degree/prerequisite eligibility is not verified; missing requirements remain unknown.',...notes]};
+  return {text,sectionIds:selected.map(c=>c.section.class_nbr),inlineMentions,assignments:schedule.students.map(s=>({userId:s.userId,requested:s.requested,sectionIds:s.candidates.map(c=>c.section.class_nbr)})),spoken};
 }

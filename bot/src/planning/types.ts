@@ -18,7 +18,8 @@ export type Projection=z.infer<typeof projectionSchema>;
 export type Section=CatalogResult['results'][number];
 export interface Fit {userId:string;name:string;status:'pass'|'conflict'|'unknown';conflicts:string[];unchecked:string[];preferences:string[];softEvidence:string[];softScore:number;timeStatus?:'checked'|'unknown'|'conflict'}
 export interface Candidate {section:Section;components:Section[];bundleVerified:boolean;componentNotes:string[];fits:Fit[];covered:number;known:number;shared:boolean;research?:OfferingResearch;findings?:Finding[]}
-export interface Recommendation {text:string;sectionIds:string[];inlineMentions?:{marker:string;userId:string}[];assignments?:{userId:string;requested:number;sectionIds:string[]}[]}
+export interface Recommendation {text:string;sectionIds:string[];inlineMentions?:{marker:string;userId:string}[];assignments?:{userId:string;requested:number;sectionIds:string[]}[];
+  spoken?:{members:{name:string;requested:number;choices:{course:string;section:string;instructors:string[];meetings:string;reasons:string[];unchecked:string[]}[]}[];shared:{course:string;names:string[];preliminary:boolean}[];limitations:string[]}}
 export interface GroupPlanner {recommend(session:PlanningSession,question:string,signal:AbortSignal):Promise<Recommendation>}
 export interface PlanningProjection {project(session:PlanningSession,question:string,signal:AbortSignal):Promise<Projection>}
 export interface PlanningQuery {term:string;subject?:string;catalog?:string;keyword?:string;delivery?:'A'|'O'}

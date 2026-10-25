@@ -39,6 +39,7 @@ test('voice controls require explicit consent and backend tool arguments cannot 
   await assert.rejects(()=>backend.tool(actor,{tool_name:'research_course',tool_call_id:'forged',parameters:{question:'test',userId:'bob'}},new AbortController().signal));
   await assert.rejects(()=>backend.tool(other,{tool_name:'research_course',tool_call_id:'outsider',parameters:{question:'test'}},new AbortController().signal),/expired/);
   await assert.rejects(()=>backend.tool(actor,{tool_name:'delete_session',tool_call_id:'unknown',parameters:{}},new AbortController().signal));
+  await assert.rejects(()=>backend.tool(actor,{tool_name:'recommend_group',tool_call_id:'unasked',parameters:{}},new AbortController().signal,'Hey Ray, what is CSE 445 about?'),/explicitly/);
   assert.equal(called,0);
   const answer=await backend.tool(actor,{tool_name:'research_course',tool_call_id:'valid',parameters:{question:'test'}},new AbortController().signal);
   assert.equal(called,1);assert.equal((answer as {answer:string}).answer,'answer');

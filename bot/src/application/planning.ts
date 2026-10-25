@@ -1,5 +1,5 @@
 import {isGroupRequest} from '../planning/engine.js';
-import type {GroupPlanner} from '../planning/types.js';
+import type {GroupPlanner,Recommendation} from '../planning/types.js';
 import {roomId} from '../persistence/planning-store.js';
 import { ResearchMemory } from '../persistence/research-context.js';
 import type { ResearchContext } from '../research/types.js';
@@ -165,6 +165,76 @@ export class PlanningApplication {
       await tx.enqueue({...response(answer,[actor.userId]),requestId});
     });
     return answer;
+  }
+  async voiceIntake(room:Room,sessionId:string,actor:Actor,sourceId:string,text:string):Promise<void>{
+    await this.store.transact(room,sourceId,async tx=>{
+      const state=tx.state;
+      if(state?.id!==sessionId||!state.participants[actor.userId]?.active)return;
+      const content=text.trim().slice(0,4000);
+      if(!content)return;
+      // Speech is pending evidence, not an immediate change to validated preferences.
+      const ignored=isCourseQuestion(content)||/^(?:(?:hey|hi|okay|ok)\s*[,!]?\s*)?ray[\s,:]+(?:what|who|how|why|which|tell|recommend|find|summarize)\b/i.test(content);
+      state.messages.push({id:sourceId,authorId:actor.userId,content,ordinal:++state.nextOrdinal,ignored});
+      while(state.messages.length>this.limits.messages||state.messages.reduce((n,m)=>n+m.content.length,0)>this.limits.characters){state.messages.shift();state.truncated=true;}
+    });
+  }
+  private async voiceRefresh(room:Room,sessionId:string,actor:Actor,signal:AbortSignal,all=false):Promise<PlanningSession>{
+    const snapshot=await this.store.read(room);
+    if(snapshot?.id!==sessionId||!snapshot.participants[actor.userId]?.active)throw new PlanningError('Voice planning membership expired.');
+    const patches:{userId:string;patch:Patch;cursor:number}[]=[];
+    for(const person of Object.values(snapshot.participants).filter(p=>p.active&&(all||p.userId===actor.userId))){
+      signal.throwIfAborted();
+      const messages=snapshot.messages.filter(m=>m.authorId===person.userId&&m.ordinal>person.cursor&&!m.ignored);
+      if(!messages.length)continue;
+      const input={userId:person.userId,profile:person.profile,messages};
+      const patch=await this.language.extract(input);validatePatch(patch,input);
+      patches.push({userId:person.userId,patch,cursor:Math.max(...messages.map(m=>m.ordinal))});
+    }
+    signal.throwIfAborted();
+    const applied=await this.store.transact(room,`voice-refresh:${randomUUID()}`,async tx=>{
+      signal.throwIfAborted();const state=tx.state;
+      if(state?.id!==sessionId||state.version!==snapshot.version||state.nextOrdinal!==snapshot.nextOrdinal||!state.participants[actor.userId]?.active)throw new PlanningError('Preferences changed while reading notes. Ask Ray again.');
+      let changed=false;
+      for(const item of patches){
+        const person=state.participants[item.userId]!;
+        for(const fact of item.patch.facts){
+          const previous=person.profile.facts[fact.field];
+          if(JSON.stringify({strength:previous?.strength,values:previous?.values})!==JSON.stringify({strength:fact.strength,values:fact.values}))changed=true;
+          const sources=[...new Map([...(previous?.sources??[]),...fact.sources].map(source=>[JSON.stringify(source),source])).values()].slice(-12);
+          person.profile.facts[fact.field]={...fact,sources};
+        }
+        if(item.patch.facts.length)person.profile.version++;
+        person.cursor=item.cursor;
+      }
+      if(changed){this.cancelPlan(room);state.version++;delete state.currentRequest;}
+      return structuredClone(state);
+    });
+    return applied.value!;
+  }
+  async voiceNotes(room:Room,sessionId:string,actor:Actor,signal:AbortSignal):Promise<unknown>{
+    const state=await this.voiceRefresh(room,sessionId,actor,signal);
+    const person=state.participants[actor.userId]!;
+    return {name:person.name,semester:semesterName(state.term),facts:Object.values(person.profile.facts).filter((f):f is Fact=>Boolean(f)).map(f=>({field:f.field,strength:f.strength,values:f.values})),
+      instruction:'Read only this member’s saved needs. Unknown fields stay unknown. Do not imply a recommendation was accepted.'};
+  }
+  async voiceRecommend(room:Room,sessionId:string,actor:Actor,signal:AbortSignal):Promise<unknown>{
+    if(!this.groupPlanner)throw new PlanningError('Group planning is unavailable.');
+    const snapshot=await this.voiceRefresh(room,sessionId,actor,signal,true);
+    const requestId=`voice-plan:${randomUUID()}`;
+    const result:Recommendation=await this.groupPlanner.recommend(snapshot,'Find shared classes for our group that we can take together.',signal);
+    signal.throwIfAborted();
+    await this.store.transact(room,requestId,async tx=>{
+      signal.throwIfAborted();const state=tx.state;
+      if(state?.id!==sessionId||state.version!==snapshot.version||!state.participants[actor.userId]?.active)throw new PlanningError('Preferences changed. Request a fresh recommendation.');
+      state.lastRecommendation={inputVersion:state.version,sectionIds:result.sectionIds,createdAt:new Date().toISOString()};
+      const body={...response(result.text,Object.values(state.participants).filter(p=>p.active).map(p=>p.userId)),requestId,
+        inlineMentions:result.inlineMentions?.filter(m=>state.participants[m.userId]?.active)};
+      await tx.enqueue(body,true);
+    });
+    return {semester:semesterName(snapshot.term),members:Object.values(snapshot.participants).filter(p=>p.active).map(p=>({name:p.name,
+      assignedSectionIds:result.assignments?.find(a=>a.userId===p.userId)?.sectionIds??[],requested:result.assignments?.find(a=>a.userId===p.userId)?.requested??null})),
+      presentation:result.spoken??'Structured spoken recommendation details are unavailable. Refer to the detailed plan posted in text; do not invent courses from section IDs.',
+      instruction:'Address each member by name, then summarize shared options. Preserve preliminary and missing-data qualifications. This is a proposal, not consensus.'};
   }
   async message(event: Incoming): Promise<void> {
     if (event.bot || event.webhook) return;

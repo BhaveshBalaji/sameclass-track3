@@ -140,6 +140,14 @@ Added `/voice join consent:true`, leave, owner/moderator pause/resume/end, condi
 
 The build, 31 existing offline regressions and six voice checks pass. A command-contract expectation was updated for the added `/voice` command. Live syllabi/professor speech, follow-up timing and interruption latency remain unverified until runtime credentials and Discord participants are available. Quiet note intake is deliberately still a no-op here; V2 adds it, so V1 is not presented as note-taking support.
 
+### V2–V3 implementation (live acceptance pending)
+
+Quiet finalized voice messages now enter the shared bounded planning context with author/source IDs. They do not change validated profile versions or start models until a notes/recommendation checkpoint. Read-back refreshes only the speaker; group recommendation refreshes all joined participants. Course-information questions are excluded from preference evidence. Extraction validates author-owned quotes and rejects results after reset, new intake or competing profile changes. Existing text profile/reset behavior uses the same stored facts/sources; reset also clears ephemeral voice context.
+
+The real planner now exposes spoken names, selected courses/sections, instructors, meetings, evidence-based reasons, shared options and limitations directly from the same allocation used for text. The voice wrapper publishes through the existing outbox, checks versions/cancellation and requires an explicit recommendation utterance before running that tool. It does not recover decisions by parsing Markdown or infer consent to a proposed schedule. The notes and recommendation tools are attached to the dedicated agent; recap is attached in preparation for V4.
+
+Four isolated-Postgres voice regressions passed for separate notes/corrections, research-question isolation, reset during extraction, both-member refresh and cancellation before publication. The group suite passed (23 tests before adding one focused spoken/text allocation consistency check); the updated eight-test recommendation file and six voice protocol/controller tests passed. Live group readout remains pending; no voice milestone is marked complete.
+
 - [ ] V0: voice transport and conversational tool proof.
 - [ ] V1: live conversational course questions.
 - [ ] V2: separate student notes and corrections.
