@@ -2,7 +2,7 @@
 
 ## Voice Ray (implemented; live acceptance pending)
 
-Voice is off by default in the checked-in configuration. The local runtime key has now been supplied, and voice is enabled in the ignored `.env` with the dedicated agent and **General** voice channel configured. Live agent/tool/generated-speech and realtime transcription checks passed, as did an empty-channel Discord connection and silent-playback proof. The user subsequently confirmed an audible reply to a real microphone notes-read-back request. Commands are registered and the worker is running. Two-person attribution, course follow-ups, interruptions and full rehearsals remain pending. See [V0–V4 evidence](../docs/voice-ray-milestones.md).
+Voice is off by default in the checked-in configuration. Locally it is enabled with the dedicated ElevenLabs agent, **ray-help** voice channel and **ray-voice-help** text channel. Voice controls run only in that text channel; attempts from the original planning channel receive a private redirect. Main text planning remains available. The user confirmed an audible reply to a real microphone request before the channel move. The worker is running with the new setup; two-person attribution, interruption recovery and full rehearsals remain pending. See [V0–V4 evidence](../docs/voice-ray-milestones.md).
 
 The ElevenLabs plugin created a dedicated development agent. Its nonsecret ID and tool/voice configuration are in `bot/voice-agent.json`; it requires authentication, has voice recording disabled and agent transcript retention set to one day. Separate Scribe transcription has its own provider retention policy; zero retention is not claimed. A plugin login does not automatically give the local worker an API key.
 
@@ -13,6 +13,8 @@ VOICE_ENABLED=false
 ELEVENLABS_API_KEY=your_runtime_key
 ELEVENLABS_AGENT_ID=agent_7501m5scd31dfd6sgqtr92yj8e2d
 DISCORD_VOICE_CHANNEL_ID=your_server_voice_channel_id
+DISCORD_VOICE_TEXT_CHANNEL_ID=your_voice_commands_and_results_text_channel_id
+VOICE_INTERRUPTION_RMS=1000
 VOICE_MAX_PARTICIPANTS=4
 VOICE_MAX_DURATION_SECONDS=1200
 VOICE_FOLLOWUP_SECONDS=30
@@ -32,7 +34,7 @@ npm run test:voice:planning    # isolated Postgres preference/planning regressio
 
 After configuration and the provider proof, set `VOICE_ENABLED=true`, register commands with `npm run register:commands`, then start the worker normally. Avoid a second worker connected to the same live Discord/database namespace.
 
-1. Start a normal `/plan start` session in the allowed text channel and have each student click **Join planning**.
+1. Start a `/plan start` session in **ray-voice-help** and have each student click **Join planning**. This dedicated channel has its own planning workspace; existing main-channel profiles/history are preserved, not silently copied into it.
 2. Join the configured voice channel. Each student runs `/voice join consent:true` in that same text channel to opt in to audio/transcript processing. `consent:false` shows the notice. Being in the voice channel alone does not opt someone in.
 3. Speak naturally; finalized utterances become bounded, author-attributed pending notes. Say “Hey Ray, what is CSE 445 about?” for a course answer; source-linked detail appears in text. The same speaker can ask a follow-up without “Ray” within 30 seconds; another speaker addresses Ray to take over.
 4. Ask “Ray, what have you noted for me?” to refresh/read only your profile. Correct your own preferences, then request another read-back. Research questions do not become planning facts. A group recommendation refreshes all joined members' pending notes, including their text contributions.
@@ -43,6 +45,8 @@ After configuration and the provider proof, set `VOICE_ENABLED=true`, register c
 The session stops after 20 minutes and has a 30-addressed-turn cap. End/rejoin manually after a connection failure or exhausted session; saved profiles persist but audio is never replayed. Speech bursts are limited to 30 seconds. Start with turn-taking and headphones: overlapping humans, background noise and acoustic echo are outside the demo's verified behavior. Voice activity stops buffered Ray audio; stale provider/tool results are suppressed. The controller reconnects the hosted agent for each addressed turn, restoring up to six bounded conversation entries; it does not promise seamless provider session recovery.
 
 Successful client-tool results explicitly send `is_error:false`, as required by the live provider. Some live voice sessions did not send `agent_response_complete`; after final answer text, a two-second quiet-audio fallback finishes the stream only when no tools are pending. Interruption still stops playback immediately. A focused regression covers quiet pre-tool acknowledgements and delayed research results so this fallback does not end a turn while research is running.
+
+Ray now uses **Jessica**, a warm female conversational voice, with a less formal persona and explicit spoken summaries after tool results. A newly opted-in participant receives a short greeting when Ray is idle; greeting events do not enter their notes or invoke research tools. The initial acknowledgement's audio cannot satisfy the final-answer completion check: after a tool returns, Ray waits for new spoken-answer audio. A live delayed-tool check verified 330,240 bytes of speech after the result. Quiet comfort-noise/clicks must pass a sustained-speech gate before they open transcription or interrupt Ray; `VOICE_INTERRUPTION_RMS` adjusts its sensitivity.
 
 Reconnecting waits for the previous socket's close acknowledgement and a short provider-cleanup interval, since the development workspace allows only one active conversation. During debugging, `VOICE_DIAGNOSTICS=true` logs capture phases, packet/PCM counts and transcription character counts; it does not log transcripts, audio or credentials. Leave it false for routine use. If repeated speech keeps interrupting Ray before an answer, use headphones and test one complete question followed by a quiet pause.
 

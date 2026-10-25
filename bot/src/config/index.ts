@@ -65,6 +65,8 @@ const schema = z.object({
   ELEVENLABS_API_KEY: z.string().trim().default(''),
   ELEVENLABS_AGENT_ID: z.string().trim().default(''),
   DISCORD_VOICE_CHANNEL_ID: z.string().default(''),
+  DISCORD_VOICE_TEXT_CHANNEL_ID: z.string().default(''),
+  VOICE_INTERRUPTION_RMS: z.coerce.number().int().min(100).max(10000).default(1000),
   VOICE_MAX_PARTICIPANTS: z.coerce.number().int().min(1).max(4).default(4),
   VOICE_MAX_DURATION_SECONDS: z.coerce.number().int().min(60).max(1200).default(1200),
   VOICE_FOLLOWUP_SECONDS: z.coerce.number().int().min(0).max(60).default(30),
@@ -83,6 +85,7 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
     const missing = ['ELEVENLABS_API_KEY', 'ELEVENLABS_AGENT_ID', 'DISCORD_BOT_TOKEN']
       .filter(key => !result.data[key as keyof typeof result.data]);
     if (!/^\d{17,20}$/.test(result.data.DISCORD_VOICE_CHANNEL_ID)) missing.push('DISCORD_VOICE_CHANNEL_ID');
+    if (result.data.DISCORD_VOICE_TEXT_CHANNEL_ID&&!/^\d{17,20}$/.test(result.data.DISCORD_VOICE_TEXT_CHANNEL_ID)) missing.push('DISCORD_VOICE_TEXT_CHANNEL_ID');
     if (missing.length) throw new ConfigurationError(`Missing voice configuration: ${missing.join(', ')}`);
   }
   return result.data;

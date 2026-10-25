@@ -4,12 +4,12 @@ import { EventEmitter } from 'node:events';
 import OpusScript from 'opusscript';
 import type WebSocket from 'ws';
 import { parseConfig } from '../src/config/index.js';
-import { discordPCM, SpeechDecoder } from '../src/voice/audio.js';
+import { discordPCM, SpeechDecoder,SpeechActivityGate } from '../src/voice/audio.js';
 import { ElevenAgent, ScribeUtterance, type AgentCallbacks } from '../src/voice/elevenlabs.js';
 import { VoiceSession, type ConversationalConnection } from '../src/voice/session.js';
 import { PlanningVoiceBackend } from '../src/application/voice.js';
 import type { PlanningApplication } from '../src/application/planning.js';
-import { commandDefinitions } from '../src/transport/discord/commands.js';
+import { commandDefinitions,discordSettings,voiceCommandAllowed } from '../src/transport/discord/commands.js';
 
 class Socket extends EventEmitter {
   readyState = 1;
@@ -55,6 +55,21 @@ test('real Opus packets decode into Scribe audio; output converts to Discord PCM
     assert.equal(output.length,24);assert.equal(output.readInt16LE(0),123);assert.equal(output.readInt16LE(12),-321);
     assert.throws(()=>discordPCM(pcm,22050),/Unsupported/);
   }finally{decoder.close();encoder.delete();}
+});
+test('voice commands are limited to the dedicated text channel while main planning remains available',()=>{
+  const c=parseConfig({DISCORD_BOT_TOKEN:'synthetic',DISCORD_APPLICATION_ID:'111111111111111111',DISCORD_GUILD_ID:'111111111111111111',
+    DISCORD_PLANNING_CHANNEL_IDS:'222222222222222222',DISCORD_VOICE_TEXT_CHANNEL_ID:'333333333333333333'});
+  assert.equal(voiceCommandAllowed(c,'222222222222222222'),false);
+  assert.equal(voiceCommandAllowed(c,'333333333333333333'),true);
+  assert.ok(discordSettings(c).channels.has('222222222222222222'));assert.ok(discordSettings(c).channels.has('333333333333333333'));
+});
+test('quiet background audio and a single loud click do not interrupt a response',()=>{
+  const gate=new SpeechActivityGate(1000),quiet=Buffer.alloc(640),speech=Buffer.alloc(640);
+  for(let i=0;i<640;i+=2){quiet.writeInt16LE(450,i);speech.writeInt16LE(5000,i);}
+  for(let i=0;i<20;i++)assert.equal(gate.push(quiet),false);
+  assert.equal(gate.push(speech),false);assert.equal(gate.push(quiet),false);
+  assert.equal(gate.push(speech),false);assert.equal(gate.push(speech),false);assert.equal(gate.push(speech),true);
+  assert.equal(gate.detected,true);assert.equal(gate.push(speech),false);
 });
 
 test('agent protocol authenticates, dispatches tools and suppresses late output after cancellation',async()=>{
@@ -133,6 +148,8 @@ test('audio-idle completion waits for tool results and final answer text when th
   release({answer:'Synthetic result'});await tick();
   await new Promise(resolve=>setTimeout(resolve,25));assert.equal(completions,0);
   socket.event({type:'agent_response',agent_response_event:{agent_response:'Here is the result.'}});
+  socket.event({type:'agent_response_complete'});
+  await new Promise(resolve=>setTimeout(resolve,25));assert.equal(completions,0,'acknowledgement audio must not complete the final answer before its speech arrives');
   socket.event({type:'audio',audio_event:{audio_base_64:'AAAA'}});
   await new Promise(resolve=>setTimeout(resolve,25));assert.equal(completions,1);
 });
@@ -175,6 +192,17 @@ test('the observed E-RAY transcription variant can address Ray',async()=>{
     {audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},()=>({start:async()=>{},message:()=>{requests++;},close:()=>{}}));
   session.join(actor);await session.transcript(actor.userId,'E-RAY, what have you noted for me?');
   assert.equal(requests,1);session.close();
+});
+test('joining greeting is conversational, never becomes student evidence, and cannot call tools',async()=>{
+  let intake=0,requests=0;const callbacks:AgentCallbacks[]=[];
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{intake++;},tool:async()=>assert.fail('greeting must not use tools')},
+    {audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},cb=>{callbacks.push(cb);return {start:async()=>{},message:()=>{requests++;},close:()=>{}};});
+  await session.greet(actor);assert.equal(requests,0);
+  session.join(actor);await session.greet(actor);assert.equal(requests,1);assert.equal(intake,0);
+  await assert.rejects(()=>callbacks[0]!.tool({tool_name:'get_my_notes',tool_call_id:'bad',parameters:{}},new AbortController().signal),/Greeting/);
+  callbacks[0]!.complete();
+  await session.transcript(actor.userId,'Hello!');assert.equal(requests,2);assert.equal(intake,1);
+  session.close();
 });
 
 test('pause/resume, context reset and leave/rejoin invalidate transcripts awaiting authorization or storage',async()=>{

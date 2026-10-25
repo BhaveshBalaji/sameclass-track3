@@ -26,3 +26,16 @@ export function speechEnergy(pcm: Buffer): number {
   for (let n = 0; n + 1 < pcm.length; n += 2) sum += pcm.readInt16LE(n) ** 2;
   return pcm.length ? Math.sqrt(sum / (pcm.length / 2)) : 0;
 }
+
+/** Reject quiet comfort-noise packets and isolated clicks before opening ASR or interrupting. */
+export class SpeechActivityGate {
+  private consecutive=0;
+  detected=false;
+  constructor(private threshold=1000){}
+  push(pcm:Buffer):boolean{
+    if(this.detected)return false;
+    this.consecutive=speechEnergy(pcm)>this.threshold?this.consecutive+1:0;
+    if(this.consecutive<3)return false;
+    this.detected=true;return true;
+  }
+}

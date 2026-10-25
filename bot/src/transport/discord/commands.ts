@@ -29,7 +29,10 @@ export function discordSettings(config: Config) {
       || !channels.length || channels.some(id => !snowflake.test(id))) {
     throw new ConfigurationError('Set DISCORD_BOT_TOKEN, DISCORD_APPLICATION_ID, DISCORD_GUILD_ID and comma-separated DISCORD_PLANNING_CHANNEL_IDS.');
   }
-  return { channels: new Set(channels), guildId: config.DISCORD_GUILD_ID };
+  return { channels: new Set([...channels,...(config.DISCORD_VOICE_TEXT_CHANNEL_ID?[config.DISCORD_VOICE_TEXT_CHANNEL_ID]:[])]), guildId: config.DISCORD_GUILD_ID };
+}
+export function voiceCommandAllowed(config:Config,channelId:string|null):boolean{
+  return !config.DISCORD_VOICE_TEXT_CHANNEL_ID||channelId===config.DISCORD_VOICE_TEXT_CHANNEL_ID;
 }
 export async function registerCommands(config: Config): Promise<void> {
   discordSettings(config);

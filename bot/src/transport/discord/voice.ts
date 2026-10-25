@@ -5,7 +5,7 @@ import { ChannelType, PermissionFlagsBits, type Client, type ChatInputCommandInt
 import type { Config } from '../../config/index.js';
 import type { PlanningApplication } from '../../application/planning.js';
 import { PlanningError, type Actor, type Room } from '../../domain/planning.js';
-import { discordPCM, SpeechDecoder, speechEnergy } from '../../voice/audio.js';
+import { discordPCM, SpeechDecoder, speechEnergy,SpeechActivityGate } from '../../voice/audio.js';
 import { ScribeUtterance } from '../../voice/elevenlabs.js';
 import { VoiceSession, type VoiceBackend } from '../../voice/session.js';
 
@@ -57,8 +57,10 @@ export class DiscordVoice {
         if (!this.live?.session.participants.size) this.close();
         throw new PlanningError('Planning or voice membership changed. Join voice again to opt in.');
       }
+      const alreadyJoined=this.live!.session.participants.has(actor.userId);
       try { this.live!.session.join(actor); } catch { throw new PlanningError('This demo supports up to four voice participants.'); }
       await interaction.editReply({content:`You joined Voice Ray. ${voiceNotice}`,allowedMentions:{parse:[]}});
+      if(!alreadyJoined)void this.live!.session.greet(actor).catch(()=>{});
       return;
     }
     const live = this.live;
@@ -128,9 +130,19 @@ export class DiscordVoice {
     this.diagnostic('capture_started',{captureId});
     // Subscribe immediately to retain the wake phrase while authorization is checked.
     const receive=live.connection.receiver.subscribe(userId,{end:{behavior:EndBehaviorType.AfterSilence,duration:700}});
-    const decoder=new SpeechDecoder();let scribe:ScribeUtterance|undefined,pending:Buffer[]=[],bytes=0,voiced=0,ended=false,closed=false;
+    const decoder=new SpeechDecoder(),speech=new SpeechActivityGate(this.config.VOICE_INTERRUPTION_RMS);
+    let scribe:ScribeUtterance|undefined,pending:Buffer[]=[],bytes=0,ended=false,closed=false,authorized=false;
     const close=()=>{if(closed)return;closed=true;clearTimeout(timeout);receive.destroy();decoder.close();scribe?.close();live.captures.delete(userId);};
     const timeout=setTimeout(()=>{ended=true;receive.destroy();if(scribe)scribe.finish();else close();},30000);
+    const startScribe=()=>{
+      if(!authorized||!speech.detected||scribe||closed)return;
+      scribe=new ScribeUtterance(this.config.ELEVENLABS_API_KEY,text=>{
+        this.diagnostic('transcript_completed',{captureId,characters:text.length,packets,pcmBytes});
+        close();if(text&&this.live===live&&live.session.accepts(userId))void live.session.transcript(userId,text).catch(()=>{});
+      },()=>{this.diagnostic('transcription_failed',{captureId,packets,pcmBytes});close();if(this.live===live)void live.status?.edit({content:'Voice transcription failed. Please try again or use text.',allowedMentions:{parse:[]}}).catch(()=>{});});
+      for(const pcm of pending)scribe.write(pcm);pending=[];bytes=0;
+      if(ended)scribe.finish();
+    };
     live.captures.set(userId,close);
     receive.on('error',(error)=>{this.diagnostic('receive_error',{captureId,packets,pcmBytes,type:error.name});close();});
     receive.on('data',(packet:Buffer)=>{
@@ -138,19 +150,15 @@ export class DiscordVoice {
       try{
         const pcm=decoder.decode(packet);
         packets++;pcmBytes+=pcm.length;peakEnergy=Math.max(peakEnergy,Math.round(speechEnergy(pcm)));
-        if(speechEnergy(pcm)>300){voiced++;if(voiced===3)live.session.interrupt();}else voiced=0;
+        if(speech.push(pcm)){this.diagnostic('speech_interrupt',{captureId,peakEnergy});live.session.interrupt();}
         if(scribe)scribe.write(pcm);else{bytes+=pcm.length;if(bytes>160000){close();return;}pending.push(pcm);}
+        startScribe();
       }catch{this.diagnostic('decode_error',{captureId,packets,pcmBytes});close();}
     });
-    receive.on('end',()=>{this.diagnostic('capture_ended',{captureId,packets,pcmBytes,peakEnergy});ended=true;scribe?.finish();});
+    receive.on('end',()=>{this.diagnostic('capture_ended',{captureId,packets,pcmBytes,peakEnergy});ended=true;if(scribe)scribe.finish();else if(authorized)close();});
     const actor=live.session.participants.get(userId);
     if(!actor||!await this.backend(live.room,live.sessionId).authorized(actor)||closed||this.live!==live){close();return;}
-    scribe=new ScribeUtterance(this.config.ELEVENLABS_API_KEY,text=>{
-      this.diagnostic('transcript_completed',{captureId,characters:text.length,packets,pcmBytes});
-      close();if(text&&this.live===live&&live.session.accepts(userId))void live.session.transcript(userId,text).catch(()=>{});
-    },()=>{this.diagnostic('transcription_failed',{captureId,packets,pcmBytes});close();if(this.live===live)void live.status?.edit({content:'Voice transcription failed. Please try again or use text.',allowedMentions:{parse:[]}}).catch(()=>{});});
-    for(const pcm of pending)scribe.write(pcm);pending=[];
-    if(ended)scribe.finish();
+    authorized=true;startScribe();if(ended&&!scribe)close();
   }
   async reconcile():Promise<void>{
     const live=this.live;if(!live)return;
@@ -165,7 +173,10 @@ export class DiscordVoice {
     live.captures.get(userId)?.();live.session.leave(userId);
     if(!live.session.participants.size)this.close();
   }
-  clearContext():void{this.stopCaptures();this.live?.session.clearContext();}
+  clearContext(room?:Room):void{
+    if(room&&(this.live?.room.channelId!==room.channelId||this.live.room.guildId!==room.guildId))return;
+    this.stopCaptures();this.live?.session.clearContext();
+  }
   private stopCaptures():void{for(const close of [...this.live?.captures.values()??[]])close();}
   close():void{
     const live=this.live;if(!live)return;

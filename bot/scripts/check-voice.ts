@@ -13,21 +13,23 @@ async function main(){
   if(missing.length)throw new ConfigurationError(`Missing voice configuration: ${missing.join(', ')}`);
   if(!process.argv.includes('--live'))return;
   // OPT-IN PAID: one synthetic generated conversation/tool round trip; no Discord posts.
-  let bytes=0,toolCalls=0;const chunks:Buffer[]=[];
+  let bytes=0,toolCalls=0,toolReturned=false,postToolAudioBytes=0;const chunks:Buffer[]=[];
   await new Promise<void>((resolve,reject)=>{
     const timer=setTimeout(()=>{agent.close();reject(new Error('Voice provider proof timed out.'));},30000);
     const agent=new ElevenAgent(config,{
-      audio:(pcm,rate)=>{if(rate!==16000)throw new Error('Probe needs PCM 16 kHz.');bytes+=pcm.length;chunks.push(pcm);},text:()=>{},
+      audio:(pcm,rate)=>{if(rate!==16000)throw new Error('Probe needs PCM 16 kHz.');bytes+=pcm.length;if(toolReturned)postToolAudioBytes+=pcm.length;chunks.push(pcm);},text:()=>{},
       tool:async call=>{
         if(call.tool_name!=='get_my_notes')throw new Error('Unexpected probe tool.');
         toolCalls++;
+        if(process.argv.includes('--slow-tool'))await new Promise(resolve=>setTimeout(resolve,3000));
+        toolReturned=true;
         return {name:'Synthetic Probe',facts:[],instruction:'This is a synthetic integration check. Say briefly that no preferences are saved.'};
       },
       complete:reason=>{
         clearTimeout(timer);agent.close();
         console.log(JSON.stringify({check:'voice_agent_observation',completion:reason,toolCalls,audioBytes:bytes}));
-        if(!bytes||!toolCalls)reject(new Error('Voice proof needs both generated audio and a tool call.'));
-        else{console.log(JSON.stringify({check:'voice_agent_protocol',synthetic:true,toolCalls,audioBytes:bytes,discordAudioVerified:false,scribeVerified:false}));resolve();}
+        if(!bytes||!toolCalls||(process.argv.includes('--slow-tool')&&!postToolAudioBytes))reject(new Error('Voice proof needs generated audio after the tool result.'));
+        else{console.log(JSON.stringify({check:'voice_agent_protocol',synthetic:true,toolCalls,audioBytes:bytes,postToolAudioBytes,discordAudioVerified:false,scribeVerified:false}));resolve();}
       },
       failed:()=>{clearTimeout(timer);reject(new Error('Voice provider proof failed.'));},
     });

@@ -6,7 +6,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, Even
 import type { Config } from '../../config/index.js';
 import { PlanningError, type Outgoing, type Room } from '../../domain/planning.js';
 import type { PlanningApplication } from '../../application/planning.js';
-import { discordSettings } from './commands.js';
+import { discordSettings,voiceCommandAllowed } from './commands.js';
 import { DiscordVoice } from './voice.js';
 import { PlanningVoiceBackend } from '../../application/voice.js';
 
@@ -64,6 +64,9 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
         ? semesterChoices(interaction.options.getFocused()) : []); return;
     }
     if (!interaction.isChatInputCommand() && !interaction.isButton()) return;
+    if(interaction.isChatInputCommand()&&interaction.commandName==='voice'&&!voiceCommandAllowed(config,interaction.channelId)){
+      await interaction.reply({content:`Use voice commands in <#${config.DISCORD_VOICE_TEXT_CHANNEL_ID}>.`,flags:MessageFlags.Ephemeral,allowedMentions:allowedMentions([])});return;
+    }
     if (!permitted(interaction.guildId,interaction.channelId)) {
       await interaction.reply({ content: 'Use Ray in a configured planning channel.', flags: MessageFlags.Ephemeral, allowedMentions: allowedMentions([]) }); return;
     }
@@ -86,7 +89,7 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
             case 'recommend': await app.recommend(room,interaction.id,actor); break;
             case 'status': await app.status(room,interaction.id); break;
             case 'profile': await app.profile(room,interaction.id,actor); break;
-            case 'reset-profile': await app.resetProfile(room,interaction.id,actor); voice.clearContext(); break;
+            case 'reset-profile': await app.resetProfile(room,interaction.id,actor); voice.clearContext(room); break;
             case 'reset-session': await app.requestReset(room,interaction.id,actor); break;
           }
         } else { await interaction.editReply('This command is not handled by Ray.'); return; }

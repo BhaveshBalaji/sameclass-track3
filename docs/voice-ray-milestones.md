@@ -180,6 +180,14 @@ Further capture traces showed some utterances persisting to the 30-second cap de
 
 After rejoining and asking the notes read-back question once, the user explicitly confirmed **“Ray answered aloud.”** This establishes the basic real Discord microphone → transcription → local notes tool → agent speech → human-audible playback path for one participant on this code. Keep Ray running for further testing. This single confirmation does not verify two-speaker isolation, course-source follow-ups, interruption recovery, named group recommendations or the two full rehearsals.
 
+### Dedicated channels, natural female voice and post-tool speech
+
+At the user's request, local configuration now points to voice channel `1563952043130101840` (**ray-help**) and text channel `1563952319450718308` (**ray-voice-help**). Read-only Discord checks verified both types and the configured guild. The dedicated text channel is allowlisted for planning/voice controls and receives that workspace's source-linked results; voice commands in the old main text channel receive a private redirect. Existing main planning channels and state remain unchanged. Discord may still suggest the guild slash command in its picker; the bot enforces channel restriction when invoked rather than disabling unrelated main-channel commands.
+
+Switched the dedicated agent to the verified Jessica female conversational voice, retained its low-latency audio model, and updated the complete saved prompt for warmer concise dialogue, a join greeting and mandatory spoken answers after tool results. Read-back verified the voice ID and prompt. Greetings are server events, do not become participant evidence and cannot invoke tools. The original acknowledgement no longer counts as final-answer audio: the bridge resets its speech-completion gate at tool return and waits for fresh audio before closing the response. A live deliberately delayed-tool check produced 409,600 PCM bytes total, including 330,240 after the tool result.
+
+Added a configurable sustained-speech energy gate to suppress quiet background/comfort noise and isolated clicks before interruption or ASR startup, while preserving the initial buffered speech. Build, 15 voice tests and 31 existing offline regressions passed. Tests cover dedicated command routing, greeting isolation, quiet-noise rejection and delayed final speech. The worker was restarted with the requested channels. Human confirmation of the new voice/greeting and real course-answer readout remains pending.
+
 - [ ] V0: one participant's complete real microphone/notes-tool/spoken-answer path confirmed by the user; two-speaker isolation and interruptions pending.
 - [ ] V1: course tool and follow-up code tested; live spoken questions pending.
 - [ ] V2: separate notes/corrections/reset tested with isolated Postgres; live speaker recognition and read-back pending.

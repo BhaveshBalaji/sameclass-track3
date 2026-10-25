@@ -82,21 +82,23 @@ export class ElevenAgent {
   }
   private event(event: any): void {
     if (event.type === 'ping') this.send({ type: 'pong', event_id: event.ping_event.event_id });
-    if (event.type === 'audio') { this.heardAudio = true;this.callbacks.audio(Buffer.from(event.audio_event.audio_base_64, 'base64'), this.rate);this.settleAudio(); }
+    if (event.type === 'audio') { if(!this.pendingTools)this.heardAudio = true;this.callbacks.audio(Buffer.from(event.audio_event.audio_base_64, 'base64'), this.rate);this.settleAudio(); }
     if (event.type === 'agent_response') { this.responseSeen = true;this.callbacks.text(String(event.agent_response_event.agent_response).slice(0,8000));this.settleAudio(); }
-    if (event.type === 'agent_response_complete' && this.requested && this.responseSeen && !this.pendingTools) this.finish('provider');
+    if (event.type === 'agent_response_complete' && this.requested && this.responseSeen && this.heardAudio && !this.pendingTools) this.finish('provider');
     if (event.type === 'client_tool_call') {
       const call = event.client_tool_call as VoiceToolCall;
       if (!call || typeof call.tool_call_id !== 'string' || typeof call.tool_name !== 'string') throw new Error('Invalid tool call.');
       if (this.calls.has(call.tool_call_id)) return;
       if (this.calls.size >= 12) { this.fail(); return; }
       this.calls.add(call.tool_call_id);
-      this.pendingTools++;this.responseSeen=false;clearTimeout(this.idleTimer);
+      this.pendingTools++;this.responseSeen=false;this.heardAudio=false;clearTimeout(this.idleTimer);
       void this.callbacks.tool(call, this.controller.signal).then(result => {
+        this.heardAudio=false;this.responseSeen=false;
         const serialized=JSON.stringify(result);
         if (!this.closed) this.send({ type: 'client_tool_result', tool_call_id: call.tool_call_id,
           result:serialized.length<=24000?serialized:JSON.stringify({error:'Result is too large for a spoken answer. Refer to the linked text result or /plan profile for full details; do not invent a summary.'}),is_error:false });
       }).catch(() => {
+        this.heardAudio=false;this.responseSeen=false;
         this.send({ type: 'client_tool_result', tool_call_id: call.tool_call_id, result: 'The requested action could not be completed.', is_error: true });
       }).finally(()=>{this.pendingTools--;this.settleAudio();});
     }
