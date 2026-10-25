@@ -1,3 +1,4 @@
+import {namedSubject} from './subjects.js';
 import {SYLLABUS_EXTRACTION_LIMIT} from './syllabus-view.js';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -52,6 +53,29 @@ export class ResearchSources {
     if(limited)limitations.push(`Only the first ${this.candidates} sections are available to this research request.`);
     return this.evidence(key,'catalog',task,{...data,results:data.results.slice(0,this.candidates)},data.retrieved_at,
       [catalogUrl({term,subject:task.subject,catalog:task.catalog})],{reused:result.reused,ageMs:result.ageMs},limitations,limitations.length?'partial':'ok');
+  }
+  async discover(task:ResearchTask,budget:ResearchBudget,signal:AbortSignal):Promise<Evidence>{
+    if(!task.keyword&&!task.subject)throw new ResearchLimit('A search topic or subject is required.');
+    const subject=task.subject||namedSubject(task.keyword??'')||'';
+    // Department names should browse all CHM/BCH/etc. courses, including titles
+    // which abbreviate the department (e.g. "Gen Chem" rather than "Chemistry").
+    const keyword=namedSubject(task.keyword??'')===subject?'':task.keyword??'';
+    const term=semesterCode(task.semester),key=`discovery:${JSON.stringify([term,subject,keyword.toLowerCase(),task.delivery??'A'])}`;
+    const result=await this.read(key,'asu',this.seatsTtl,budget,signal,()=>this.asu.get('/api/search',catalogSchema,
+      {term,...(keyword?{keywords:keyword}:{}),...(subject?{subject}:{}),search_type:'all',max_pages:'10',campus_or_online_selection:task.delivery??'A'},signal));
+    const data=result.value;
+    if(data.count!==data.results.length||data.results.some(s=>s.term!==term||(subject&&s.subject!==subject)))throw new APIError('invalid_response');
+    const groups=new Map<string,CatalogResult['results']>();
+    for(const row of data.results){const code=`${row.subject} ${row.catalog_nbr}`;groups.set(code,[...groups.get(code)??[],row]);}
+    const courses=[...groups.values()].map(rows=>({subject:rows[0]!.subject,catalog_nbr:rows[0]!.catalog_nbr,term,
+      title:rows[0]!.title,sectionCount:rows.length,instructors:[...new Set(rows.flatMap(r=>r.instructors.map(i=>i.name)))].map(name=>({name}))}));
+    const limited=courses.length>150,limitations:string[]=[];
+    if(!data.complete)limitations.push('More matching courses may exist.');
+    if(limited)limitations.push(`Showing 150 of ${courses.length} matching courses.`);
+    const url=new URL(catalogUrl({term,subject,catalog:''}));if(keyword)url.searchParams.set('keywords',keyword);
+    return this.evidence(key,'discovery',{...task,subject},{keyword,subject,sectionCount:data.count,distinctCourses:courses.length,
+      complete:data.complete,pages_fetched:data.pages_fetched,results:courses.slice(0,150)},data.retrieved_at,
+      [url.toString()],{reused:result.reused,ageMs:result.ageMs},limitations,limitations.length?'partial':'ok');
   }
   async courseDetails(task:ResearchTask,budget:ResearchBudget,signal:AbortSignal):Promise<Evidence>{
     const term=semesterCode(task.semester),key=`details:${term}:${task.subject}:${task.catalog}`;

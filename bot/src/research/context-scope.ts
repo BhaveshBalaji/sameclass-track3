@@ -9,8 +9,8 @@ export function knownScope(question:string,context:ResearchContext,activeTerm?:s
   const named=explicit??recent.map(t=>coursePattern.exec(t.question)||coursePattern.exec(t.answer)).find(Boolean);
   const subject=named?.[1]?.toUpperCase()??previous?.subject;
   const catalog=named?.[2]?.toUpperCase()??previous?.catalog;
-  const value=termPattern.exec(question)?.[0]??previous?.semester
-    ??recent.map(t=>termPattern.exec(t.question)?.[0]??termPattern.exec(t.answer)?.[0]).find(Boolean)??activeTerm;
+  const value=termPattern.exec(question)?.[0]
+    ??recent.map(t=>termPattern.exec(t.question)?.[0]??t.tasks.find(task=>task.semester)?.semester??termPattern.exec(t.answer)?.[0]).find(Boolean)??activeTerm;
   let semester:string|undefined;
   try{if(value)semester=semesterName(semesterCode(value));}catch{/* An invalid candidate is unknown, not an invitation to guess. */}
   return {subject,catalog,semester};

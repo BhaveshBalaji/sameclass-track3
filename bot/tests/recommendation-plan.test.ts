@@ -70,6 +70,17 @@ test('legacy available-before-5 statement becomes hard; Tuesday work and unknown
   assert.ok(plan.students.every(s=>!s.candidates.some(c=>c.section.class_nbr==='90006')));
   assert.ok(!a.candidates.some(c=>c.section.class_nbr==='90003')||!a.candidates.some(c=>c.section.class_nbr==='90005'));
 });
+test('spoken choices and shared names come from the same allocated candidates as text assignments',()=>{
+  const session=attendanceSession(scenario()),candidates=matched(session),schedule=allocate(session,candidates);
+  const result=renderPlan(session,schedule,candidates,[]);
+  for(const student of schedule.students){
+    const spoken=result.spoken!.members.find(m=>m.name===session.participants[student.userId]!.name)!;
+    const assigned=result.assignments!.find(a=>a.userId===student.userId)!;
+    assert.deepEqual(spoken.choices.map(c=>c.section),assigned.sectionIds);
+    assert.deepEqual(spoken.choices.map(c=>c.course),student.candidates.map(c=>`${c.section.subject} ${c.section.catalog_nbr}`));
+  }
+  assert.ok(result.spoken!.limitations.some(s=>s.includes('eligibility')));
+});
 test('no universal class still yields a partial-group plan; same course, overlapping sections and closed labs do not fill extra slots',()=>{
   const session=attendanceSession(scenario()),p=projection(session);
   // No common time: Anish can take Wednesday evening; Bhavshu can take Tuesday morning.

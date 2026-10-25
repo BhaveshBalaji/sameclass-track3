@@ -1,5 +1,63 @@
 # Ray · local Discord planning bot
 
+## Voice Ray (implemented; live acceptance pending)
+
+Voice is off by default in the checked-in configuration. Locally it is enabled with the dedicated ElevenLabs agent, **ray-help** voice channel and **ray-voice-help** text channel. Voice controls run only in that text channel; attempts from the original planning channel receive a private redirect. Main text planning remains available. The user confirmed an audible reply to a real microphone request before the channel move. The worker is running with the new setup; two-person attribution, interruption recovery and full rehearsals remain pending. See [V0–V4 evidence](../docs/voice-ray-milestones.md).
+
+The ElevenLabs plugin created a dedicated development agent. Its nonsecret ID and tool/voice configuration are in `bot/voice-agent.json`; it requires authentication, has voice recording disabled and agent transcript retention set to one day. Separate Scribe transcription has its own provider retention policy; zero retention is not claimed. A plugin login does not automatically give the local worker an API key.
+
+Add the following values to the existing ignored root `.env` without replacing its other credentials:
+
+```dotenv
+VOICE_ENABLED=false
+ELEVENLABS_API_KEY=your_runtime_key
+ELEVENLABS_AGENT_ID=agent_7501m5scd31dfd6sgqtr92yj8e2d
+DISCORD_VOICE_CHANNEL_ID=your_server_voice_channel_id
+DISCORD_VOICE_TEXT_CHANNEL_ID=your_voice_commands_and_results_text_channel_id
+VOICE_INTERRUPTION_RMS=1000
+VOICE_MAX_PARTICIPANTS=4
+VOICE_MAX_DURATION_SECONDS=1200
+VOICE_MAX_TURNS=30
+```
+
+Use a runtime key from the same ElevenLabs workspace with agent conversation and realtime speech-to-text access. Never put it in source code, Discord messages or screenshots. The single configured regular voice channel must belong to the configured guild; Ray needs View Channel, Connect and Speak. The worker requests `GuildVoiceStates` only with voice enabled and joins without self-deafening. Its computer/network must permit Discord voice UDP traffic; hosted deployment is deferred.
+
+```bash
+npm run check:voice             # local setup, Opus and DAVE dependency checks; no inference
+npm run check:voice -- --live   # OPT-IN PAID synthetic agent/audio/tool proof; no Discord posts
+npm run check:voice -- --live --greeting # OPT-IN PAID tiny greeting/audio proof, no Discord posts
+npm run check:voice -- --live --routing # OPT-IN PAID synthetic conversational routing checks
+npm run check:voice -- --live --research # OPT-IN PAID real keyword catalog lookup through agent + generated speech
+npm run check:voice -- --live --scribe # also transcribe the same generated synthetic audio
+npm run check:discord-voice -- --connect # worker stopped, EMPTY channel only; silent playback, no capture
+npm run test:voice             # offline protocol/controller/audio regressions
+npm run test:voice:planning    # isolated Postgres preference/planning regressions
+```
+
+After configuration and the provider proof, set `VOICE_ENABLED=true`, register commands with `npm run register:commands`, then start the worker normally. Avoid a second worker connected to the same live Discord/database namespace.
+
+1. Use **ray-voice-help** for voice commands. Planning is optional for basic questions and notes. For shared recommendations, use `/plan start`, choose a semester and click **Join planning**. Starting planning preserves guest voice notes. This channel has its own workspace.
+2. Join the configured voice channel. Each student runs `/voice join consent:true` in that same text channel to opt in to audio/transcript processing. `consent:false` shows the notice. Being in the voice channel alone does not opt someone in.
+3. Speak naturally; finalized utterances become bounded, author-attributed pending notes. Say “Hey Ray, what is CSE 445 about?” for a course answer; source-linked detail appears in text. No wake word is required. Ray routes finalized speech using the current speaker, recent group discussion, its own replies and whether it is busy. Requests and clarification answers can trigger replies without a name; friend-to-friend conversation and personal statements stay passive notes. A recognized replacement question interrupts the old reply. Semantic routing adds a short transcription/model delay; it cannot perfectly infer addressees in every group conversation.
+4. Ask “Ray, what have you noted for me?” to refresh/read only your profile. Correct your own preferences, then request another read-back. Research questions do not become planning facts. A group recommendation refreshes all joined members' pending notes, including their text contributions.
+5. Ask “Ray, recommend classes for our group.” Ray calls the existing planner; the spoken names/courses and posted assignments come from the same allocated options. The result remains a proposal and retains missing-data/eligibility qualifications.
+6. Ask for a session recap to summarize saved needs/proposed section IDs and unresolved unknowns in text and voice. Ask “Ray, why that option?” while the bounded conversation context remains active for a brief explanation. Ray does not infer votes or acceptance.
+7. `/voice pause` and `/voice resume` are for the planning-session owner/moderator. `/voice leave` removes your capture; Ray stays while any human remains in the voice channel; the last human leaving disconnects it. `/voice end` ends the room for the owner/moderator. Channel departure revokes audio intake. Leaving planning does not revoke separate voice consent; use `/voice leave` to stop audio intake. Profile reset clears retained sources and ephemeral voice conversation context.
+
+The session stops after 20 minutes and has a 30-addressed-turn cap. End/rejoin manually after a connection failure or exhausted session; saved profiles persist but audio is never replayed. Speech bursts are limited to 30 seconds. Start with turn-taking and headphones: overlapping humans, background noise and acoustic echo are outside the demo's verified behavior. A semantically routed replacement question stops buffered Ray audio after transcription and intent recognition; stale provider/tool results are suppressed. The controller reconnects the hosted agent for each addressed turn, restoring up to sixteen bounded, speaker-attributed entries of shared group context; it does not promise seamless provider session recovery.
+
+Successful client-tool results explicitly send `is_error:false`, as required by the live provider. Some live voice sessions did not send `agent_response_complete`; after final answer text, completion waits for the estimated playback duration of all queued PCM plus two seconds of quiet, with no tools pending. Provider synthesis can run ahead of Discord playback, so a short network gap cannot finish a reply while generated speech remains queued. Recognized Ray interruptions stop playback; unrelated human speech does not. A focused regression covers quiet pre-tool acknowledgements and delayed research results so this fallback does not end a turn while research is running.
+
+Ray now uses **Jessica**, a warm female conversational voice, with a less formal persona and explicit spoken summaries after tool results. A newly opted-in participant receives a short greeting when Ray is idle; greeting events do not enter their notes or invoke research tools. The initial acknowledgement's audio cannot satisfy the final-answer completion check: after a tool returns, Ray waits for new spoken-answer audio. A live delayed-tool check verified 330,240 bytes of speech after the result. Quiet comfort-noise/clicks must pass a sustained-speech gate before they open transcription or interrupt Ray; `VOICE_INTERRUPTION_RMS` adjusts its sensitivity.
+
+Reconnecting waits for the previous socket's close acknowledgement and a short provider-cleanup interval, since the development workspace allows only one active conversation. During debugging, `VOICE_DIAGNOSTICS=true` logs capture phases, packet/PCM counts and transcription character counts; it does not log transcripts, audio or credentials. Leave it false for routine use. A recognized question for Ray or a request to stop interrupts its response; ordinary discussion remains passive notes. Use headphones to avoid feeding Ray’s own speech back through a microphone.
+
+Scribe uses speech-based VAD to finalize utterances rather than relying solely on Discord's silence-packet behavior. Explicit receiver end and the 30-second cap can also commit a turn. Empty transcription results release capture immediately and do not become notes, so a quiet or unrecognized turn cannot block subsequent speech.
+
+Automatic proactive suggestions are deferred. Complete the two-person audio/source/interruption checks and the checklist's two rehearsals before marking voice milestones complete. No live source answers are replaced by demo fixtures.
+
+If Ray is present and shows **listening** but stays quiet after “Hello,” address it explicitly: **“Hey Ray, what have you noted for me?”** Ordinary discussion is retained as pending notes without a spoken reply. A semantic router decides when a spoken response is useful, without a wake word. An optional Ray address remains a direct fallback when the router is unavailable. The listening notice explains active context-aware routing. Transcripts are processed by OpenRouter for those decisions; only opted-in speakers are captured.
+
 Milestones 0–3 implement local startup, portable configuration, Postgres persistence, Discord preference intake and LLM-driven course research. LangGraph coordinates a planner, bounded research workers and an answer writer. DeepSeek through OpenRouter/Relace selects relevant research tasks; the AI SDK tool loop calls scoped ASU/RMP tools. Shared schedule recommendations remain Milestone 4 work.
 
 ## Setup and start
@@ -90,6 +148,8 @@ In the configured server text channel:
 
 `/ask` now uses the same LLM research path as course-information mentions. The planner selects only relevant catalog, course-detail, syllabus or review tasks. The model writes a question-specific answer from retrieved evidence; the older deterministic catalog renderer remains covered by contract tests but is not the production `/ask` coordinator. Source links are constructed by code, not invented by the model.
 
+Keyword discovery works without a course code or department: “Ray, find database-related courses next semester.” If Ray asks for a semester, say “Ray, Spring 2027.” The pending goal is stored with that speaker’s research context. Searches use ASU's native `keywords` filter, preserve source links and disclose partial coverage. Mixed topic requests can select up to two discovered courses for syllabus/review follow-up within the existing research budget. Specific-course requests still support independent catalog, details, syllabus and RMP retrieval. Discovery rows are representative sections per distinct course; section counts are not course counts. Future offerings and actual source availability are verified through tools rather than guessed.
+
 Try “Who teaches CSE 240 in Spring 2027?” or “For CSE 575 in Spring 2027 with Yingzhen Yang, summarize the syllabus exam grading and relevant RMP reviews.” Missing course/year information is clarified. Research keeps six recent exchanges per user/channel and supports explicit replies to Ray, including a reply to an older answer. Ordinary messages do not invoke Ray. Known courses, semesters and instructor shortlists carry into follow-ups. General questions and professor-only RMP questions do not require unnecessary course/semester intake. The active planning semester can be reused, but profiles are not changed by research questions.
 
 Syllabus tools verify a current offering before requesting its exact term/section text. Only a 404 triggers the backend’s labeled historical same-instructor/other-instructor fallback; timeouts/rate limits are not evidence of absence. Answers retain source semester/section/instructor, page references, truncation and missing/OCR status. Historical grading is not a claim about the current offering. Citations labeled **Syllabus Link** open the actual source document, including a historical document. Cached syllabus text gets a fresh download URL before reuse. A resolving backend document route is used if the source URL cannot be refreshed. **Class Link** points to ASU classes; professor RMP links use the instructor name.
@@ -179,3 +239,16 @@ Each participant receives an individual inline Discord mention with their course
 Set `RAY_RECOMMENDATION_INTAKE=true` to exercise the actual session start, join, ordinary-message intake, `/plan recommend`, preference extraction and application delivery path instead of constructing profiles directly. This mode writes only to isolated test Postgres storage using the existing replay guard and cleans up its session/checkpoints afterward. Use `RAY_TEST_DATABASE_URL` for an existing dedicated test database. The check rejects empty or incomplete live assignments rather than passing on an empty result; it also checks course/term identity, duplicate courses and the individual explanation format. Neither mode sends Discord messages.
 
 Search cache keys include term, subject, catalog filter, keyword and delivery, so distinct concurrent searches cannot share a different query's response. Research enriches the full bounded candidate pool instead of reducing it to the initial shortlist. If evidence changes the selected plan, one bounded follow-up batch researches newly selected sections under the same source-call budget/deadline; failed sections are not retried. An unknown source remains unknown if the follow-up budget runs out. Individual responses include saved preferences, attendance fit and source-supported topic reasons where the official description contains a matching topic. This conservative topic explanation does not establish workload or eligibility. The group summary names the best shared course in the selected plan and distinguishes partial-group sharing from a course assigned to everyone.
+
+
+Active voice routing supersedes the earlier explicit-address requirement. One bounded model decision runs per finalized opted-in utterance, using up to sixteen recent attributed entries and no raw audio. Routing is serialized so decisions do not arrive out of order; a new answer cancels the prior provider/tools without revoking queued speech. Pause, profile/context reset, leave and session end still invalidate pending decisions. Background discussion provides conversational context; it never makes one person's preferences evidence for another person's profile. If routing is unavailable, ordinary speech is still noted and an optional direct Ray address can request a reply. Shared recent conversation is ephemeral; existing per-user research memory and saved notes persist through the established stores. This is bounded context, not unlimited meeting recall.
+
+
+Chemistry discovery uses the ASU subject directory: CHM = Chemistry, BCH = Biochemistry, CSE = Computer Science and Engineering, plus 340 other published subjects (Spring 2027 snapshot in `src/research/subjects.ts`). Department names browse their subject without a redundant title keyword; broader topics retain keyword search. Discovery fetches up to ten source pages and retains up to 150 compact distinct-course summaries instead of twelve full section records. Complete retrieval can still produce a concise shortlist; request all courses for the full retrieved list. Coverage is disclosed only when genuinely incomplete, and course eligibility remains unchecked.
+
+Discord playback now releases a stream whenever the player becomes idle, including starvation during a long research tool call. New speech creates a fresh resource instead of writing to a stopped one. A real AudioPlayer regression verifies acknowledgement → idle gap → final-answer playback. Runtime tolerates one second of missed frames to smooth smaller synthesis gaps. Voice status cards are one line, consent information appears only when joining/requested, and local capture diagnostics are off. Six older verbose voice notices were shortened in the dedicated channel. Live human playback confirmation after this transport fix remains pending.
+
+
+Arrival greetings use Discord channel presence separately from audio consent. Ray gives each human a tiny “Hi Name!” greeting, including people already present when it connects. Arrivals during an answer queue until it finishes; an interrupted greeting that has not produced audio is retried afterward. Greetings use only public display names, cannot invoke tools and do not opt anyone into transcription. Each speaker still uses `/voice join consent:true` for questions or interruptions. The voice starter’s departure transfers room controls to a remaining human and does not end the room or interrupt another member’s answer. `/voice leave` opts out of capture while keeping channel presence; `/voice end`, actual empty-room departure, session limits and connection failures retain their established shutdown behavior.
+
+Short stop controls (“stop”, “stop talking”, “wait”, “hold on”, “can you stop”) have a direct partial-transcript path; they do not wait for the routing model. Likely question partials pause queued playback while the completed utterance is classified. A new bot request cancels the old answer/tools; friend-directed speech resumes the buffered answer. Failed/empty captures and departing speakers release their playback holds. Stop also suppresses queued greetings until a later request, explicit resume or new arrival. Recognition still depends on receiving/transcribing opted-in microphone speech; no perfect detection or live multi-person acceptance is claimed.

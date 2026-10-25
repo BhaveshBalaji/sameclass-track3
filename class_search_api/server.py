@@ -39,7 +39,7 @@ async def invalid_value(request: Request, exc: ValueError):
     return JSONResponse(status_code=422, content={'detail': str(exc)})
 
 
-ALIASES = {'catalog_nbr': 'catalogNbr', 'instructor': 'instructorName', 'days': 'daysOfWeek',
+ALIASES = {'keyword': 'keywords', 'catalog_nbr': 'catalogNbr', 'instructor': 'instructorName', 'days': 'daysOfWeek',
            'start_date': 'startDate', 'end_date': 'endDate', 'search_type': 'searchType',
            'scroll_id': 'scrollId', 'campus_or_online_selection': 'campusOrOnlineSelection'}
 LOCAL = {'max_pages', 'include_raw', 'location'}

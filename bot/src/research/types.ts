@@ -2,15 +2,16 @@ import type {SyllabusCoverage} from './syllabus-view.js';
 import { z } from 'zod';
 
 export const taskSchema=z.object({
-  kind:z.enum(['catalog','details','syllabus','reviews']),subject:z.union([z.string().regex(/^[A-Z]{2,5}$/),z.literal('')]),
+  kind:z.enum(['catalog','discovery','details','syllabus','reviews']),subject:z.union([z.string().regex(/^[A-Z]{2,5}$/),z.literal('')]),
+  keyword:z.string().trim().min(1).max(120).nullable().default(null).describe('Topic to search, e.g. database for database-related courses. Supply for discovery; null for other tasks.'),
   catalog:z.union([z.string().regex(/^\d{3}[A-Z]?$/),z.literal('')]),semester:z.string().max(40),
   professor:z.string().min(2).max(100).nullable(),classNumber:z.string().regex(/^\d+$/).nullable(),
 });
-export type ResearchTask=z.infer<typeof taskSchema>&{delivery?:'A'|'O'};
+export type ResearchTask=Omit<z.infer<typeof taskSchema>,'keyword'>&{keyword?:string|null;delivery?:'A'|'O'};
 export const planSchema=z.object({tasks:z.array(taskSchema).max(12),clarification:z.string().max(500).nullable(),refresh:z.boolean(),directAnswer:z.string().max(1500).nullable().default(null)});
-export type ResearchPlan=z.infer<typeof planSchema>;
-export interface ResearchTurn {requestId:string;parentRequestId?:string;userId?:string;question:string;answer:string;tasks:ResearchTask[];instructors:string[];sources?:string[];syllabusCoverage?:SyllabusCoverage[]}
-export interface ResearchContext {offeringScope?:{subject:string;catalog:string;semester:string;sectionId:string;instructors:string[];delivery?:'A'|'O'};signal?:AbortSignal;turns:ResearchTurn[];result?:{tasks:ResearchTask[];instructors:string[];sources?:string[];syllabusCoverage?:SyllabusCoverage[]}}
+export type ResearchPlan=Omit<z.infer<typeof planSchema>,'tasks'>&{tasks:ResearchTask[]};
+export interface ResearchTurn {pendingQuestion?:string;requestId:string;parentRequestId?:string;userId?:string;question:string;answer:string;tasks:ResearchTask[];instructors:string[];sources?:string[];syllabusCoverage?:SyllabusCoverage[]}
+export interface ResearchContext {offeringScope?:{subject:string;catalog:string;semester:string;sectionId:string;instructors:string[];delivery?:'A'|'O'};signal?:AbortSignal;turns:ResearchTurn[];result?:{pendingQuestion?:string;tasks:ResearchTask[];instructors:string[];sources?:string[];syllabusCoverage?:SyllabusCoverage[]}}
 export interface Evidence {
   id:string;kind:string;entity:string;status:'ok'|'partial'|'unavailable'|'ambiguous';
   retrievedAt:string;retrievedAtLocal:string;sources:string[];data:unknown;limitations:string[];

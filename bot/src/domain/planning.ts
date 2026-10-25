@@ -22,11 +22,12 @@ export function mergeFactUpdates(patch:Patch):Patch {
 }
 export type Field = z.infer<typeof fieldSchema>;
 export interface Profile { version: number; facts: Partial<Record<Field, Fact>> }
-export interface Participant { userId: string; name: string; active: boolean; profile: Profile; silenceAsked: boolean; cursor: number }
+export interface Participant { userId: string; name: string; active: boolean; voice?: boolean; profile: Profile; silenceAsked: boolean; cursor: number }
 export interface PlanningMessage { id: string; authorId: string; content: string; ordinal: number; ignored?: boolean }
 export interface Clarification { id: string; userId: string; field: Field | 'participation'; question: string;
   state: 'pending' | 'answered'; responseId: string; messageIds: string[] }
 export interface PlanningSession {
+  voiceOnly?: boolean;
   id: string; guildId: string; channelId: string; creatorId: string; term: string; version: number;
   participants: Record<string, Participant>; messages: PlanningMessage[]; nextOrdinal: number; truncated: boolean;
   clarifications: Clarification[]; currentRequest?: string;
