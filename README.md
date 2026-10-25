@@ -1,89 +1,116 @@
-# SameClass · Track 3 APIs
+<p align="center"><img src="landing/public/assets/ray-icon.png" alt="Ray sun icon" width="96" /></p>
+<h1 align="center">Ray</h1>
+<p align="center"><strong>Keep the connection. Lose the legwork.</strong></p>
+<p align="center">Your friends do the talking. Ray does the course research.</p>
+<p align="center"><a href="https://ray-common-class.glossyalder32.chatgpt.site/">Explore the public website →</a></p>
 
-**Find classes friends can take together, without losing what each person needs.**
+![Ray landing page](docs/images/ray-landing.png)
 
-This repository contains the course-research backend for SameClass: two independently runnable Python APIs, ready for the group-chat coordinator to call. It carries forward the ASU and Rate My Professors integrations from Class_Helper, without the old UI, LLM agents, Reddit pipeline, local caches, or credentials.
+## Why Ray?
 
-| Folder | What it provides | Default port |
-| --- | --- | --- |
-| [class_search_api](class_search_api/) | Live ASU sections, all original search filters, subjects, complete course details, prerequisites, current/historical syllabus resolution, document download and text extraction | 8000 |
-| [rmp_api](rmp_api/) | School search, professor search/details, ratings, paginated review text, bounded bulk professor/review retrieval | 8001 |
+Planning a semester together means comparing schedules, searching courses, reading syllabi, and checking professors. Ray brings that research into your Discord conversation so friends can discuss and decide together.
 
-## Bot implementation plan
+- **Keep the human connection.** Students share their own interests and make the final decisions.
+- **Research in one place.** Ask about courses, syllabi, and professor reviews inside Discord.
+- **Respect individual needs.** Treat explicit availability and work hours as hard constraints.
+- **Find common ground.** Maximize shared classes, with individual alternatives when needed.
+- **Show the evidence.** Link sources and flag missing or uncertain information.
+- **Talk it through.** Opt into voice to ask questions and request group recommendations aloud.
 
-**Voice Ray — implementation in place, live acceptance pending.** The optional Discord voice adapter connects a dedicated ElevenLabs conversational agent to Ray's course tools, separate student notes and named group recommendations. See [voice setup and controls](bot/README.md#voice-ray-implemented-live-acceptance-pending) and [milestone evidence/pending checks](docs/voice-ray-milestones.md). Voice stays off until runtime credentials and a channel are configured; a live two-person audio demonstration has not yet been verified. Proactive suggestions and hosted voice deployment are deferred.
+## See the story
 
-The APIs and Ray’s Milestones 0–2 are complete. Milestone 3 adds an LLM research workflow for catalog facts, course descriptions, syllabi and RMP reviews. Live API/model checks pass; the new Discord answers and message visibility are awaiting the user's smoke check. See the [bot setup guide](bot/README.md) for one-command local startup and validation. Start with the [canonical milestone checklist](docs/discord-bot-milestones.md), consult the [workflow and architecture](docs/workflow-architecture.md) while implementing, and use the [mock chat scenarios](docs/mock-chat-scenarios.md) for testing. The [integration validation](docs/integration-validation.md) records API capabilities and limitations the bot must handle.
+The [public website](https://ray-common-class.glossyalder32.chatgpt.site/) walks through six scenes:
 
-## Start both services
+1. Four friends share interests and availability.
+2. Ray finds courses that match their questions.
+3. Students ask about professor reviews.
+4. Ray checks a syllabus for topics and grading.
+5. The group gets shared classes and individual alternatives.
+6. Friends discuss their plans with Ray in a voice channel.
 
-Python **3.11+**. Run these commands from the repository root:
+| Plan together | Talk with Ray |
+| --- | --- |
+| ![Discord group planning scene](docs/images/ray-group-planning.png) | ![Discord voice channel scene](docs/images/ray-voice.png) |
+
+The website uses scripted example data and a prerecorded, five-voice conversation. Unmute the illustrated mic to play it. Live research and recommendations run through the separate Discord bot.
+
+## Try Ray in Discord
+
+- `/ask question:What do we learn in CSE 573?` — research a course, syllabus, or professor.
+- `/plan start semester:Spring 2027` — start a workspace; each student clicks **Join planning**.
+- Chat naturally about interests, schedules, and preferences.
+- `/plan recommend` — get individual recommendations and a shared group summary.
+- `/voice join consent:true` — opt into audio processing in the configured voice channel.
+
+See the [bot guide](bot/README.md) for configuration, permissions, voice controls, and profile resets.
+
+## Run locally
+
+**Requirements:** Node 24.8 (`.nvmrc`), Python 3.11+, Docker with Compose, and your own provider/Discord credentials.
 
 ```bash
+npm ci
 python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirements.txt
+cp .env.example .env  # First setup only; preserve an existing .env
 ```
 
-In two terminals with the environment activated:
+Fill in `.env` using the [setup guide](bot/README.md#setup-and-start), then:
 
 ```bash
-python -m uvicorn class_search_api.server:app --host 127.0.0.1 --port 8000
+npm run register:commands
+npm run dev
 ```
+
+This starts local Postgres, migrations, both research APIs, and the bot worker. Voice needs additional ElevenLabs/channel configuration and is off by default.
+
+To run only the website:
 
 ```bash
-python -m uvicorn rmp_api.server:app --host 127.0.0.1 --port 8001
+npm ci --prefix landing
+npm run dev --prefix landing
 ```
 
-Explore [ASU API docs](http://127.0.0.1:8000/docs) and [RMP API docs](http://127.0.0.1:8001/docs). Each service also exposes `/health`, `/redoc`, and `/openapi.json`. The checked-in `openapi.json` files document the same routes and core response models.
-
-Neither service needs an LLM key, student password, database, or the original Class_Helper checkout. Imports and health checks do not contact external sources. Each folder has its own requirements and can be copied alongside an empty `__init__.py`-aware Python project without the other folder.
-
-## Connect the teammate's coordinator
+## How it works
 
 ```mermaid
 flowchart LR
-  A[Confirmed student preferences] --> B[ASU section search]
-  B --> C[Course details and prerequisites]
-  B --> D[Resolve syllabus and extract text]
-  B --> E[Find correct RMP professor]
-  E --> F[Read review pages]
-  C --> G[Coordinator checks fit and explains options]
-  D --> G
-  F --> G
+  A[Friends in Discord: text or voice] --> B[Ray: questions and preferences]
+  B --> C[ASU catalog and syllabi]
+  B --> D[Rate My Professors]
+  C --> E[Source-linked answers and schedule checks]
+  D --> E
+  E --> F[Friends discuss and decide]
 ```
 
-1. Call `/api/search` with `term`, course/interest filters, and a bounded `max_pages`.
-2. Use each result's `course_id` for `/api/courses` or `/api/course_description`. Use `meeting_intervals` and `timezone` for deterministic schedule checks; an `unknown` interval cannot establish a conflict-free schedule.
-3. In parallel, call `/api/syllabus/lookup` with the course and professor name, and search `/api/professors` for that instructor at the correct RMP school. ASU Tempe's RMP school ID is `15723` (also accepts `U2Nob29sLTE1NzIz`). Confirm identity using name, school, and department; name search may return multiple people.
-4. Fetch `/api/professors/{id}/reviews/all`. Keep the full comments for interpretation and respect the returned coverage. Review `class` is the original RMP course label, not a standardized course ID.
-5. Keep source timestamps, profile/class URLs, syllabus term, warnings, and retrieval status with the evidence. A missing source should leave a field unknown while the rest of the recommendation can proceed.
+| Part | Purpose |
+| --- | --- |
+| [Discord bot](bot/) | TypeScript, LangGraph, student profiles, research, planning, voice |
+| [ASU API](class_search_api/) | Sections, schedules, prerequisites, syllabus retrieval |
+| [Professor API](rmp_api/) | Professor search, ratings, review text |
+| [Website](landing/) | React, Vite, GSAP scroll story, playable voice scene |
+| Postgres | Planning state, profiles, checkpoints, delivery records |
 
-The APIs retrieve evidence. The coordinator owns preference extraction, eligibility reasoning, workload interpretation, recommendations, and group-chat state.
-
-## Reliability and response contracts
-
-- Stable JSON envelopes and typed core responses; raw ASU search/course records remain available for additional source fields.
-- Short connection/read timeouts, at most two retries for transient HTTP failures, request-scoped Sessions, and bounded pagination. Time budgets stop between operations; an in-flight request may finish after the budget.
-- Page cursors, deduplication, explicit `complete`/`stop_reason`, and source timestamps. `complete` describes retrieval from the supplied cursor, not whether a human read every result.
-- HTTP `422` for invalid input; `404` for absent professor/course/syllabus; `502` for source/GraphQL failures; `503` for rate limiting or a syllabus still preparing; `504` for timeouts. Errors never become successful empty lists.
-- Syllabus discovery returns a normal JSON result with `status: ok | not_found | incomplete | unavailable`, allowing optional syllabus evidence to fail independently.
-- PDF, DOCX, HTML and text extraction; PDF page numbers; truncation markers; scanned PDFs explicitly report `ocr_required`. No OCR or automatic assignment/grading inference is claimed.
-
-These are unofficial public-source integrations. Source schemas and availability can change, and seat counts are observations rather than enrollment guarantees. Historical syllabi describe earlier offerings. The services do not enroll students or verify degree eligibility.
-
-For cross-origin browser calls, set `CORS_ORIGINS` to a comma-separated list such as `http://localhost:3000`. Server-to-server calls need no CORS. These are backend services with no application authentication; use your application's authenticated server as the caller when deploying.
-
-## Verification
+## Checks and limits
 
 ```bash
-python -m pip install -r requirements-dev.txt
-ruff check .
-pytest -q
-# Optional: real upstream checks, run only when network access is wanted
-python scripts/smoke_test.py
+npm run build
+npm test
+npm run test:voice
+.venv/bin/python -m pytest -q
+npm run build --prefix landing
 ```
 
-`requirements-lock.txt` records the exact environment used for local verification; install with `pip install -r requirements-dev.txt -c requirements-lock.txt` to reproduce it. CI tests Python 3.11–3.13 against those constraints. Offline tests do not contact ASU or RMP. The live smoke script tests the actual ASGI HTTP routes and keeps its output to source metadata and counts, without saving signed download URLs or review comments.
+- Group and voice-planning checks need an isolated test database; see the [bot guide](bot/README.md).
+- Voice is implemented; a complete live, multi-person rehearsal remains pending. See [voice validation](docs/voice-ray-milestones.md).
+- ASU and RMP are unofficial integrations. Seats change; historical syllabi may differ from current offerings.
+- Ray proposes options. It does not enroll students or verify degree eligibility.
 
-Read [verification.md](verification.md) for the tested live scenario and [SOURCE_NOTES.md](SOURCE_NOTES.md) for the extraction map. Teams can build against [class_search_api/example_response.json](class_search_api/example_response.json) and [rmp_api/example_response.json](rmp_api/example_response.json); both are explicitly synthetic contract examples.
+## More detail
+
+- [Bot setup and commands](bot/README.md)
+- [API setup, endpoints, and response contracts](docs/api-guide.md)
+- [Architecture](docs/workflow-architecture.md)
+- [Website setup and demo notes](landing/README.md)
+- [Milestone checklist](docs/discord-bot-milestones.md)
+- [API verification](verification.md) · [Source notes](SOURCE_NOTES.md)
