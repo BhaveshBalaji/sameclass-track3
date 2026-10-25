@@ -158,6 +158,10 @@ A read-only Discord API lookup found one regular voice channel, **General**. Its
 
 The pre-existing local supervisor/Gateway worker was still running and was left intact. No second live worker or voice probe was started against it, and live commands were not re-registered during this unconfigured build. The one-time scheduled kickoff was deleted after dispatch; continued work belongs to the persistent goal rather than duplicate scheduled builds.
 
+### Follow-up cancellation audit
+
+Found and fixed a transcript-admission race: an utterance waiting on authorization or note storage could otherwise reopen the provider after pause/resume, context reset or leave/rejoin. Admission now carries an abort signal through the local note transaction, and interruption invalidates pending admissions before they can start a provider turn. Eight voice regressions and six isolated-Postgres voice regressions passed, including all six lifecycle/wait combinations and prevention of retaining a cancelled source after reset. Build passed. Rechecking setup still reports only the missing runtime key; no live verification is inferred from these tests.
+
 - [ ] V0: transport/controller/dependency code tested; runtime-key/channel setup and real two-person voice proof pending.
 - [ ] V1: course tool and follow-up code tested; live spoken questions pending.
 - [ ] V2: separate notes/corrections/reset tested with isolated Postgres; live speaker recognition and read-back pending.

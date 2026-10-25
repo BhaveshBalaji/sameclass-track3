@@ -166,8 +166,9 @@ export class PlanningApplication {
     });
     return answer;
   }
-  async voiceIntake(room:Room,sessionId:string,actor:Actor,sourceId:string,text:string):Promise<void>{
+  async voiceIntake(room:Room,sessionId:string,actor:Actor,sourceId:string,text:string,signal?:AbortSignal):Promise<void>{
     await this.store.transact(room,sourceId,async tx=>{
+      signal?.throwIfAborted();
       const state=tx.state;
       if(state?.id!==sessionId||!state.participants[actor.userId]?.active)return;
       const content=text.trim().slice(0,4000);

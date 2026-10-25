@@ -80,3 +80,11 @@ test('recap refreshes notes and explicitly preserves unknowns without claiming a
   const recap=sent.find(s=>s.includes('Voice session recap'))!;
   assert.match(recap,/Bob: preferences unknown/);assert.match(recap,/no group acceptance is implied/);
 });
+test('cancelled voice admission cannot retain a source after reset',async()=>{
+  const {app,store,id}=await setup();
+  await app.resetProfile(room,'reset',alice);
+  const controller=new AbortController();controller.abort();
+  await assert.rejects(()=>app.voiceIntake(room,id,alice,'stale-admission','I work Tuesdays.',controller.signal));
+  const state=(await store.read(room))!;
+  assert.equal(state.messages.length,0);assert.deepEqual(state.participants[alice.userId]!.profile.facts,{});
+});

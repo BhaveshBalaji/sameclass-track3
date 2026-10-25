@@ -121,3 +121,30 @@ test('addressed-turn budget pauses before making another provider connection',as
   await session.transcript(actor.userId,'Hey Ray, another question.');
   assert.equal(connections,1);assert.equal(session.listening,false);session.close();
 });
+
+test('pause/resume, context reset and leave/rejoin invalidate transcripts awaiting authorization or storage',async()=>{
+  for(const phase of ['authorization','storage'] as const){
+    for(const change of ['pause','reset','rejoin'] as const){
+      let release!:()=>void,started!:()=>void,connections=0,intakeSignal:AbortSignal|undefined;
+      const pendingStep=new Promise<void>(resolve=>{release=resolve;});
+      const entered=new Promise<void>(resolve=>{started=resolve;});
+      const session=new VoiceSession(config,{
+        authorized:async()=>{if(phase==='authorization'){started();await pendingStep;}return true;},
+        intake:async(_actor,_source,_text,signal)=>{intakeSignal=signal;if(phase==='storage'){started();await pendingStep;}},
+        tool:async()=>({}),
+      },{audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},()=>{
+        connections++;return {start:async()=>{},message:()=>{},close:()=>{}};
+      });
+      session.join(actor);
+      const transcript=session.transcript(actor.userId,'Hey Ray, what are my notes?');
+      await entered;
+      if(change==='pause'){session.pause();session.resume();}
+      if(change==='reset')session.clearContext();
+      if(change==='rejoin'){session.leave(actor.userId);session.join(actor);}
+      release();await transcript;
+      assert.equal(connections,0,`${phase}/${change} must not reopen voice`);
+      if(phase==='storage')assert.equal(intakeSignal?.aborted,true);
+      session.close();
+    }
+  }
+});

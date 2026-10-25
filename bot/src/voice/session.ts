@@ -5,7 +5,7 @@ import { ElevenAgent, type AgentCallbacks, type VoiceToolCall } from './elevenla
 
 export interface VoiceBackend {
   authorized(actor: Actor): Promise<boolean>;
-  intake(actor: Actor, sourceId: string, text: string): Promise<void>;
+  intake(actor: Actor, sourceId: string, text: string, signal: AbortSignal): Promise<void>;
   tool(actor: Actor, call: VoiceToolCall, signal: AbortSignal, utterance: string): Promise<unknown>;
 }
 export interface VoiceOutput {
@@ -25,6 +25,7 @@ export class VoiceSession {
   private closed = false;
   private paused = false;
   private turns = 0;
+  private admissions = new Set<AbortController>();
   private followup?: { userId: string; until: number };
   private history: { userId: string; text: string }[] = [];
   constructor(private config: Pick<Config, 'ELEVENLABS_API_KEY' | 'ELEVENLABS_AGENT_ID' | 'VOICE_FOLLOWUP_SECONDS' | 'VOICE_MAX_PARTICIPANTS' | 'VOICE_MAX_TURNS'>,
@@ -43,7 +44,12 @@ export class VoiceSession {
   }
   get listening(): boolean { return !this.closed && !this.paused; }
   accepts(userId: string): boolean { return this.listening && this.participants.has(userId); }
-  interrupt(): void { this.generation++; this.agent?.close(); this.agent = undefined; this.output.stop(); }
+  interrupt(): void {
+    this.generation++;
+    for(const admission of this.admissions)admission.abort();
+    this.admissions.clear();
+    this.agent?.close(); this.agent = undefined; this.output.stop();
+  }
   pause(): void { this.paused = true; this.followup = undefined; this.interrupt(); this.output.status('paused'); }
   resume(): void { if (this.closed) return; this.paused = false; this.output.status('listening'); }
   close(): void { if (this.closed) return; this.closed = true; this.interrupt(); this.participants.clear(); this.history = []; this.output.status('disconnected'); }
@@ -52,13 +58,19 @@ export class VoiceSession {
   async transcript(userId: string, text: string): Promise<void> {
     const actor = this.participants.get(userId);
     if (!actor || !this.accepts(userId)) return;
-    if (!await this.backend.authorized(actor) || !this.accepts(userId)) { this.leave(userId); return; }
-    text = text.trim().slice(0,4000);
-    if (!text) return;
-    const addressed = /^(?:(?:hey|hi|okay|ok|so)\s*[,!.]?\s*)?ray\b[\s,:.!-]*/i.test(text);
-    const followup = this.followup?.userId === userId && this.followup.until > this.now();
-    await this.backend.intake(actor, `voice:${randomUUID()}`, text);
-    if (!this.accepts(userId)) return;
+    const admission=new AbortController();this.admissions.add(admission);
+    let addressed:boolean,followup:boolean|undefined;
+    try {
+      const authorized=await this.backend.authorized(actor);
+      if(admission.signal.aborted||!this.accepts(userId))return;
+      if(!authorized){this.leave(userId);return;}
+      text = text.trim().slice(0,4000);
+      if (!text) return;
+      addressed = /^(?:(?:hey|hi|okay|ok|so)\s*[,!.]?\s*)?ray\b[\s,:.!-]*/i.test(text);
+      followup = this.followup?.userId === userId && this.followup.until > this.now();
+      await this.backend.intake(actor, `voice:${randomUUID()}`, text, admission.signal);
+      if (admission.signal.aborted||!this.accepts(userId)) return;
+    } finally {this.admissions.delete(admission);}
     if (!addressed && !followup) {
       if (this.followup?.userId !== userId) this.followup = undefined;
       return;

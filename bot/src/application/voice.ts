@@ -12,8 +12,8 @@ export class PlanningVoiceBackend implements VoiceBackend {
     const state=await this.app.store.read(this.room);
     return state?.id===this.sessionId&&Boolean(state.participants[actor.userId]?.active);
   }
-  async intake(actor:Actor,sourceId:string,text:string):Promise<void>{
-    await this.app.voiceIntake(this.room,this.sessionId,actor,sourceId,text);
+  async intake(actor:Actor,sourceId:string,text:string,signal:AbortSignal):Promise<void>{
+    await this.app.voiceIntake(this.room,this.sessionId,actor,sourceId,text,signal);
   }
   async tool(actor:Actor,call:VoiceToolCall,signal:AbortSignal,utterance=''):Promise<unknown>{
     signal.throwIfAborted();
