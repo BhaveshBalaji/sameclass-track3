@@ -1,0 +1,1321 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SameClass ASU Class Search API",
+    "description": "Live catalog, sections, descriptions, prerequisites, and syllabus evidence.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "service"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/subjects": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Subjects",
+        "operationId": "subjects_api_subjects_get",
+        "parameters": [
+          {
+            "name": "term",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{3}[147]$",
+              "title": "Term"
+            }
+          },
+          {
+            "name": "sl",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[YN]$",
+              "default": "Y",
+              "title": "Sl"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Search",
+        "description": "Normalized sections. ASU native camelCase filter names also pass through.\n\nmax_pages bounds upstream requests. total is the upstream count before local\nlower/upper filters; count is the returned count. Missing seat data stays null.",
+        "operationId": "search_api_search_get",
+        "parameters": [
+          {
+            "name": "term",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{3}[147]$",
+              "title": "Term"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 5,
+              "default": "",
+              "title": "Subject"
+            }
+          },
+          {
+            "name": "catalog_nbr",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 4,
+              "default": "",
+              "title": "Catalog Nbr"
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Keyword"
+            }
+          },
+          {
+            "name": "instructor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Instructor"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "",
+                "lower",
+                "upper",
+                "grad",
+                "graduate",
+                "undergrad",
+                "undergraduate",
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9",
+                "100-199",
+                "200-299",
+                "300-399",
+                "400-499",
+                "500-599",
+                "600-699",
+                "700-799",
+                "800-899",
+                "900-999"
+              ],
+              "type": "string",
+              "default": "",
+              "title": "Level"
+            }
+          },
+          {
+            "name": "units",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 20,
+              "default": "",
+              "title": "Units"
+            }
+          },
+          {
+            "name": "college",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 30,
+              "default": "",
+              "title": "College"
+            }
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 30,
+              "default": "",
+              "title": "Location"
+            }
+          },
+          {
+            "name": "session",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 20,
+              "default": "",
+              "title": "Session"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "default": "",
+              "title": "Days"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 10,
+              "default": "",
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 10,
+              "default": "",
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "search_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "all",
+                "open"
+              ],
+              "type": "string",
+              "default": "all",
+              "title": "Search Type"
+            }
+          },
+          {
+            "name": "honors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "T",
+                "F"
+              ],
+              "type": "string",
+              "default": "F",
+              "title": "Honors"
+            }
+          },
+          {
+            "name": "campus_or_online_selection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "A",
+                "O"
+              ],
+              "type": "string",
+              "default": "A",
+              "title": "Campus Or Online Selection"
+            }
+          },
+          {
+            "name": "promod",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "T",
+                "F"
+              ],
+              "type": "string",
+              "default": "F",
+              "title": "Promod"
+            }
+          },
+          {
+            "name": "scroll_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 16384,
+              "default": "",
+              "title": "Scroll Id"
+            }
+          },
+          {
+            "name": "max_pages",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 1,
+              "title": "Max Pages"
+            }
+          },
+          {
+            "name": "include_raw",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Raw"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/raw": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Search Raw",
+        "description": "One unmodified upstream page, including aggregations and all source fields.\n\nAccepts native ASU filters in addition to the aliases on /api/search.",
+        "operationId": "search_raw_api_search_raw_get",
+        "parameters": [
+          {
+            "name": "term",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{3}[147]$",
+              "title": "Term"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/courses": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Courses",
+        "description": "Complete upstream course records, including prerequisites and college maps.",
+        "operationId": "courses_api_courses_get",
+        "parameters": [
+          {
+            "name": "term",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{3}[147]$",
+              "title": "Term"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z]{2,5}$",
+              "title": "Subject"
+            }
+          },
+          {
+            "name": "catalog_nbr",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,3}[A-Za-z]?$",
+              "title": "Catalog Nbr"
+            }
+          },
+          {
+            "name": "course_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d*$",
+              "default": "",
+              "title": "Course Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/course_description": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Course Description",
+        "operationId": "course_description_api_course_description_get",
+        "parameters": [
+          {
+            "name": "term",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{3}[147]$",
+              "title": "Term"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z]{2,5}$",
+              "title": "Subject"
+            }
+          },
+          {
+            "name": "catalog_nbr",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,3}[A-Za-z]?$",
+              "title": "Catalog Nbr"
+            }
+          },
+          {
+            "name": "course_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d*$",
+              "default": "",
+              "title": "Course Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/syllabus_url": {
+      "get": {
+        "tags": [
+          "syllabus"
+        ],
+        "summary": "Syllabus Url",
+        "description": "Original redirect endpoint; redirect=false returns JSON for tool/agent clients.",
+        "operationId": "syllabus_url_api_syllabus_url_get",
+        "parameters": [
+          {
+            "name": "class_nbr",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,6}$",
+              "title": "Class Nbr"
+            }
+          },
+          {
+            "name": "term",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{3}[147]$",
+              "title": "Term"
+            }
+          },
+          {
+            "name": "redirect",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Redirect"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/syllabus/document": {
+      "get": {
+        "tags": [
+          "syllabus"
+        ],
+        "summary": "Syllabus Document",
+        "operationId": "syllabus_document_api_syllabus_document_get",
+        "parameters": [
+          {
+            "name": "class_nbr",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,6}$",
+              "title": "Class Nbr"
+            }
+          },
+          {
+            "name": "term",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{3}[147]$",
+              "title": "Term"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/syllabus/text": {
+      "get": {
+        "tags": [
+          "syllabus"
+        ],
+        "summary": "Syllabus Text",
+        "operationId": "syllabus_text_api_syllabus_text_get",
+        "parameters": [
+          {
+            "name": "class_nbr",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,6}$",
+              "title": "Class Nbr"
+            }
+          },
+          {
+            "name": "term",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{3}[147]$",
+              "title": "Term"
+            }
+          },
+          {
+            "name": "max_chars",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500000,
+              "minimum": 100,
+              "default": 100000,
+              "title": "Max Chars"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/syllabus/lookup": {
+      "get": {
+        "tags": [
+          "syllabus"
+        ],
+        "summary": "Syllabus Lookup",
+        "description": "Current syllabus, older same instructor, then other instructors.\n\nOmit fallback_terms for six prior semesters, or supply comma-separated term\ncodes; an empty string disables historical lookup. Every fallback is labeled.",
+        "operationId": "syllabus_lookup_api_syllabus_lookup_get",
+        "parameters": [
+          {
+            "name": "term",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{3}[147]$",
+              "title": "Term"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z]{2,5}$",
+              "title": "Subject"
+            }
+          },
+          {
+            "name": "catalog_nbr",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,3}[A-Za-z]?$",
+              "title": "Catalog Nbr"
+            }
+          },
+          {
+            "name": "professor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Professor"
+            }
+          },
+          {
+            "name": "fallback_terms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fallback Terms"
+            }
+          },
+          {
+            "name": "max_pages",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3,
+              "minimum": 1,
+              "default": 2,
+              "title": "Max Pages"
+            }
+          },
+          {
+            "name": "include_text",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Include Text"
+            }
+          },
+          {
+            "name": "max_chars",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500000,
+              "minimum": 100,
+              "default": 100000,
+              "title": "Max Chars"
+            }
+          },
+          {
+            "name": "budget_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 120,
+              "minimum": 1,
+              "default": 90,
+              "title": "Budget Seconds"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyllabusResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Meeting": {
+        "properties": {
+          "days": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Days"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "unknown"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "start",
+          "end",
+          "start_date",
+          "end_date",
+          "status"
+        ],
+        "title": "Meeting"
+      },
+      "SearchResponse": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Total"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/Section"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "scroll_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scroll Id"
+          },
+          "pages_fetched": {
+            "type": "integer",
+            "title": "Pages Fetched"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "stop_reason": {
+            "type": "string",
+            "title": "Stop Reason"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "total",
+          "results",
+          "scroll_id",
+          "pages_fetched",
+          "complete",
+          "stop_reason",
+          "retrieved_at"
+        ],
+        "title": "SearchResponse"
+      },
+      "Section": {
+        "properties": {
+          "course": {
+            "type": "string",
+            "title": "Course"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "catalog_nbr": {
+            "type": "string",
+            "title": "Catalog Nbr"
+          },
+          "class_nbr": {
+            "type": "string",
+            "title": "Class Nbr"
+          },
+          "course_id": {
+            "type": "string",
+            "title": "Course Id"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "instructors": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Instructors"
+          },
+          "meeting_intervals": {
+            "items": {
+              "$ref": "#/components/schemas/Meeting"
+            },
+            "type": "array",
+            "title": "Meeting Intervals"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "open_seats": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Seats"
+          },
+          "total_seats": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Seats"
+          },
+          "class_url": {
+            "type": "string",
+            "title": "Class Url"
+          },
+          "has_syllabus": {
+            "type": "boolean",
+            "title": "Has Syllabus"
+          },
+          "syllabus_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Syllabus Url"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "course",
+          "subject",
+          "catalog_nbr",
+          "class_nbr",
+          "course_id",
+          "term",
+          "title",
+          "instructors",
+          "meeting_intervals",
+          "timezone",
+          "open_seats",
+          "total_seats",
+          "class_url",
+          "has_syllabus",
+          "syllabus_url"
+        ],
+        "title": "Section"
+      },
+      "SyllabusResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "not_found",
+              "incomplete",
+              "unavailable"
+            ],
+            "title": "Status"
+          },
+          "requested_term": {
+            "type": "string",
+            "title": "Requested Term"
+          },
+          "course": {
+            "type": "string",
+            "title": "Course"
+          },
+          "download_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Download Url"
+          },
+          "search_complete": {
+            "type": "boolean",
+            "title": "Search Complete"
+          },
+          "attempts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Attempts"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          },
+          "source_term": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Term"
+          },
+          "historical": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historical"
+          },
+          "same_professor": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Same Professor"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "pages": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Pages"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "extraction_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Status"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "status",
+          "requested_term",
+          "course",
+          "download_url",
+          "search_complete",
+          "attempts",
+          "retrieved_at"
+        ],
+        "title": "SyllabusResult"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "_note": "SYNTHETIC contract example. Professor and ratings are invented.",
+  "professors": [
+    {
+      "id": "VGVhY2hlci05OTk5OTk5OTk=",
+      "legacyId": 999999999,
+      "firstName": "Example",
+      "lastName": "Instructor",
+      "department": "Computer Science",
+      "avgRating": 4.0,
+      "numRatings": 10,
+      "wouldTakeAgainPercent": 80,
+      "avgDifficulty": 3.0,
+      "profile_url": "https://www.ratemyprofessors.com/professor/999999999"
+    }
+  ],
+  "pageInfo": {
+    "hasNextPage": false,
+    "endCursor": null
+  },
+  "didFallback": false,
+  "retrieved_at": "2026-10-25T02:00:00+00:00"
+}

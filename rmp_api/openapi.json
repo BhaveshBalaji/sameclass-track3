@@ -1,0 +1,794 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SameClass RMP API",
+    "description": "School, professor, and review research without UI dependencies.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "service"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/schools": {
+      "get": {
+        "tags": [
+          "schools"
+        ],
+        "summary": "Schools",
+        "operationId": "schools_api_schools_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 200,
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/professors": {
+      "get": {
+        "tags": [
+          "professors"
+        ],
+        "summary": "Professors",
+        "description": "One page. Keep fallback false to prevent matches from other institutions.",
+        "operationId": "professors_api_professors_get",
+        "parameters": [
+          {
+            "name": "school_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "School Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 4096,
+              "default": "",
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "fallback",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Fallback"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfessorPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/professors/all": {
+      "get": {
+        "tags": [
+          "professors"
+        ],
+        "summary": "All Professors",
+        "operationId": "all_professors_api_professors_all_get",
+        "parameters": [
+          {
+            "name": "school_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "School Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "max_pages",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Max Pages"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 4096,
+              "default": "",
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "budget_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 120,
+              "minimum": 1,
+              "default": 60,
+              "title": "Budget Seconds"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfessorCollection"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/professors/{prof_id}": {
+      "get": {
+        "tags": [
+          "professors"
+        ],
+        "summary": "Professor",
+        "operationId": "professor_api_professors__prof_id__get",
+        "parameters": [
+          {
+            "name": "prof_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Prof Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Professor"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/professors/{prof_id}/reviews": {
+      "get": {
+        "tags": [
+          "reviews"
+        ],
+        "summary": "Reviews",
+        "operationId": "reviews_api_professors__prof_id__reviews_get",
+        "parameters": [
+          {
+            "name": "prof_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Prof Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 4096,
+              "default": "",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/professors/{prof_id}/reviews/all": {
+      "get": {
+        "tags": [
+          "reviews"
+        ],
+        "summary": "All Reviews",
+        "description": "Full review text with explicit retrieval coverage. Resume using endCursor if incomplete.",
+        "operationId": "all_reviews_api_professors__prof_id__reviews_all_get",
+        "parameters": [
+          {
+            "name": "prof_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Prof Id"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "max_pages",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Max Pages"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 4096,
+              "default": "",
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "budget_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 120,
+              "minimum": 1,
+              "default": 60,
+              "title": "Budget Seconds"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewCollection"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "PageInfo": {
+        "properties": {
+          "hasNextPage": {
+            "type": "boolean",
+            "title": "Hasnextpage"
+          },
+          "endCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endcursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hasNextPage"
+        ],
+        "title": "PageInfo"
+      },
+      "Professor": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "legacyId": {
+            "type": "integer",
+            "title": "Legacyid"
+          },
+          "firstName": {
+            "type": "string",
+            "title": "Firstname"
+          },
+          "lastName": {
+            "type": "string",
+            "title": "Lastname"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "avgRating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avgrating"
+          },
+          "avgDifficulty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avgdifficulty"
+          },
+          "numRatings": {
+            "type": "integer",
+            "title": "Numratings"
+          },
+          "wouldTakeAgainPercent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wouldtakeagainpercent"
+          },
+          "profile_url": {
+            "type": "string",
+            "title": "Profile Url"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "legacyId",
+          "firstName",
+          "lastName",
+          "department",
+          "avgRating",
+          "avgDifficulty",
+          "numRatings",
+          "wouldTakeAgainPercent",
+          "profile_url"
+        ],
+        "title": "Professor"
+      },
+      "ProfessorCollection": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "pages_fetched": {
+            "type": "integer",
+            "title": "Pages Fetched"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "stop_reason": {
+            "type": "string",
+            "title": "Stop Reason"
+          },
+          "pageInfo": {
+            "$ref": "#/components/schemas/PageInfo"
+          },
+          "start_cursor": {
+            "type": "string",
+            "title": "Start Cursor"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          },
+          "professors": {
+            "items": {
+              "$ref": "#/components/schemas/Professor"
+            },
+            "type": "array",
+            "title": "Professors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "pages_fetched",
+          "complete",
+          "stop_reason",
+          "pageInfo",
+          "start_cursor",
+          "retrieved_at",
+          "professors"
+        ],
+        "title": "ProfessorCollection"
+      },
+      "ProfessorPage": {
+        "properties": {
+          "professors": {
+            "items": {
+              "$ref": "#/components/schemas/Professor"
+            },
+            "type": "array",
+            "title": "Professors"
+          },
+          "pageInfo": {
+            "$ref": "#/components/schemas/PageInfo"
+          },
+          "didFallback": {
+            "type": "boolean",
+            "title": "Didfallback"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "professors",
+          "pageInfo",
+          "didFallback",
+          "retrieved_at"
+        ],
+        "title": "ProfessorPage"
+      },
+      "ReviewCollection": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "pages_fetched": {
+            "type": "integer",
+            "title": "Pages Fetched"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "stop_reason": {
+            "type": "string",
+            "title": "Stop Reason"
+          },
+          "pageInfo": {
+            "$ref": "#/components/schemas/PageInfo"
+          },
+          "start_cursor": {
+            "type": "string",
+            "title": "Start Cursor"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          },
+          "reviews": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Reviews"
+          },
+          "profile_url": {
+            "type": "string",
+            "title": "Profile Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "pages_fetched",
+          "complete",
+          "stop_reason",
+          "pageInfo",
+          "start_cursor",
+          "retrieved_at",
+          "reviews",
+          "profile_url"
+        ],
+        "title": "ReviewCollection"
+      },
+      "ReviewPage": {
+        "properties": {
+          "reviews": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Reviews"
+          },
+          "pageInfo": {
+            "$ref": "#/components/schemas/PageInfo"
+          },
+          "profile_url": {
+            "type": "string",
+            "title": "Profile Url"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reviews",
+          "pageInfo",
+          "profile_url",
+          "retrieved_at"
+        ],
+        "title": "ReviewPage"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

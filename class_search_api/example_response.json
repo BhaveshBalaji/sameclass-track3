@@ -1,0 +1,90 @@
+{
+  "_note": "SYNTHETIC contract example. IDs and availability are invented.",
+  "count": 1,
+  "total": {
+    "value": 1,
+    "relation": "eq"
+  },
+  "results": [
+    {
+      "course": "CSE 575",
+      "subject": "CSE",
+      "catalog_nbr": "575",
+      "title": "Synthetic example: statistical machine learning",
+      "number": "99999",
+      "class_nbr": "99999",
+      "section": "",
+      "term": "2271",
+      "course_id": "000000",
+      "instructors": [
+        {
+          "name": "Example Instructor",
+          "profile_url": null
+        }
+      ],
+      "days": "M W",
+      "start": null,
+      "end": null,
+      "meeting_intervals": [
+        {
+          "days": [
+            "MON",
+            "WED"
+          ],
+          "start": "13:00",
+          "end": "14:15",
+          "start_date": "2027-01-11",
+          "end_date": "2027-04-30",
+          "status": "scheduled"
+        }
+      ],
+      "timezone": "America/Phoenix",
+      "meeting_dates": [
+        [
+          "1/11/2027",
+          "4/30/2027"
+        ]
+      ],
+      "start_date": null,
+      "end_date": null,
+      "session": null,
+      "campus": null,
+      "location": null,
+      "locations": [],
+      "instruction_mode": null,
+      "units_min": "3",
+      "units_max": "3",
+      "units": "3",
+      "open_seats": 5,
+      "total_seats": 40,
+      "enrolled": 35,
+      "waitlist_total": null,
+      "waitlist_capacity": null,
+      "status": null,
+      "component": null,
+      "associated_class": null,
+      "college": null,
+      "department": null,
+      "general_studies": {
+        "RQMNTDESIGNTN": null,
+        "GSGOLD": null,
+        "GSMAROON": null
+      },
+      "notes": null,
+      "has_syllabus": false,
+      "syllabus_url": null,
+      "class_url": "https://catalog.apps.asu.edu/catalog/classes/classlist?campusOrOnlineSelection=A&honors=F&promod=F&searchType=all&subject=CSE&catalogNbr=575&term=2271#detailsOpen=99999-000000",
+      "deadlines": {
+        "ENROLLDEADLINE": null,
+        "DROPRETAINRECORD": null,
+        "DROPWITHPENALTY": null,
+        "WITHDRAWWITHPENALTY": null
+      }
+    }
+  ],
+  "scroll_id": null,
+  "pages_fetched": 1,
+  "complete": true,
+  "stop_reason": "exhausted",
+  "retrieved_at": "2026-10-25T02:00:00+00:00"
+}

@@ -1,0 +1,2 @@
+-r class_search_api/requirements.txt
+-r rmp_api/requirements.txt
