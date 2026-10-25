@@ -35,12 +35,13 @@ async function main(){
     return;
   }
   // OPT-IN PAID: one synthetic generated conversation/tool round trip; no Discord posts.
-  const research=process.argv.includes('--research');
+  const research=process.argv.includes('--research'),greeting=process.argv.includes('--greeting');
+  let spoken='';
   let bytes=0,toolCalls=0,toolReturned=false,postToolAudioBytes=0;const chunks:Buffer[]=[];
   await new Promise<void>((resolve,reject)=>{
     const timer=setTimeout(()=>{agent.close();reject(new Error('Voice provider proof timed out.'));},research?60000:30000);
     const agent=new ElevenAgent(config,{
-      audio:(pcm,rate)=>{if(rate!==16000)throw new Error('Probe needs PCM 16 kHz.');bytes+=pcm.length;if(toolReturned)postToolAudioBytes+=pcm.length;chunks.push(pcm);},text:()=>{},
+      audio:(pcm,rate)=>{if(rate!==16000)throw new Error('Probe needs PCM 16 kHz.');bytes+=pcm.length;if(toolReturned)postToolAudioBytes+=pcm.length;chunks.push(pcm);},text:text=>{spoken=text;},
       tool:async call=>{
         if(call.tool_name!==(research?'research_course':'get_my_notes'))throw new Error('Unexpected probe tool.');
         toolCalls++;
@@ -57,13 +58,13 @@ async function main(){
       complete:reason=>{
         clearTimeout(timer);agent.close();
         console.log(JSON.stringify({check:'voice_agent_observation',completion:reason,toolCalls,audioBytes:bytes}));
-        if(!bytes||!toolCalls||((research||process.argv.includes('--slow-tool'))&&!postToolAudioBytes))reject(new Error('Voice proof needs generated audio after the tool result.'));
+        if(!bytes||(!greeting&&!toolCalls)||(greeting&&(toolCalls>0||spoken.replace(/\[[^\]]*\]/g,'').trim().split(/\s+/).length>8||!spoken.includes('Ari')))||((research||process.argv.includes('--slow-tool'))&&!postToolAudioBytes))reject(new Error('Voice proof needs generated audio after the tool result.'));
         else{console.log(JSON.stringify({check:'voice_agent_protocol',synthetic:true,toolCalls,audioBytes:bytes,postToolAudioBytes,discordAudioVerified:false,scribeVerified:false}));resolve();}
       },
       failed:()=>{clearTimeout(timer);reject(new Error('Voice provider proof failed.'));},
     });
     void agent.start('Synthetic integration check. The current speaker is Synthetic Probe. No real student data.').then(()=>{
-      agent.message(research?'Please find database-related courses for Spring 2027.':'Hey Ray, please use your notes tool to read back my saved preferences.');
+      agent.message(greeting?'SERVER EVENT: a person entered the voice channel. Say only a tiny greeting using their name: Ari. No introduction, questions or tools.':research?'Please find database-related courses for Spring 2027.':'Hey Ray, please use your notes tool to read back my saved preferences.');
     }).catch(error=>{clearTimeout(timer);agent.close();reject(error);});
   });
   if(process.argv.includes('--scribe')){

@@ -54,9 +54,11 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
   const route=config.VOICE_ENABLED?voiceRouter(config):undefined;
   const voice = new DiscordVoice(config,client,app,(room,sessionId)=>new PlanningVoiceBackend(app,room,sessionId,()=>deliver(room),route));
   client.once(Events.ClientReady,()=>{if(config.VOICE_ENABLED)console.log('Voice Ray controls are enabled.');});
-  client.on(Events.VoiceStateUpdate,(_before,after)=>{
-    if(after.id===client.user?.id&&after.channelId!==config.DISCORD_VOICE_CHANNEL_ID)voice.close();
-    else voice.departed(after.id,after.channelId);
+  client.on(Events.VoiceStateUpdate,(before,after)=>{
+    if(after.guild.id!==settings.guildId)return;
+    if(after.id===client.user?.id){if(after.channelId!==config.DISCORD_VOICE_CHANNEL_ID)voice.close();return;}
+    if(before.channelId===after.channelId||after.member?.user.bot)return;
+    voice.presenceChanged({userId:after.id,name:after.member?.displayName??after.id},after.channelId);
   });
   const destroy=client.destroy.bind(client);
   client.destroy=async()=>{voice.close();await destroy();};

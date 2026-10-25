@@ -384,3 +384,86 @@ test('real Discord playback recovers after a research gap starves the acknowledg
     playback.finish();await entersState(player,AudioPlayerStatus.Idle,2000);
   }finally{playback.stop();}
 });
+
+test('partial stop bypasses model routing and invalidates an older pending decision',async()=>{
+  let release!:(value:import('../src/voice/session.js').VoiceDecision)=>void,started!:()=>void,calls=0,closed=0;
+  const waiting=new Promise<void>(r=>{started=r;});let callback!:AgentCallbacks;
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},tool:async()=>({}),route:async input=>{
+    if(input.utterance==='Can you compare those?'){started();return new Promise(r=>{release=r;});}
+    return {action:'reply',request:input.utterance};
+  }},{audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},cb=>{callback=cb;return {start:async()=>{},message:()=>{calls++;},close:()=>{closed++;}};});
+  session.join(actor);await session.transcript(actor.userId,'Show database courses.');
+  const pending=session.transcript(actor.userId,'Can you compare those?');await waiting;
+  session.partial(actor.userId,'stop');assert.equal(closed,1);
+  release({action:'reply',request:'stale comparison'});await pending;assert.equal(calls,1);
+  await session.transcript(actor.userId,'stop talking');assert.equal(calls,1);session.close();
+});
+
+test('question partials hold playback, friend speech resumes it, and a new question replaces it',async()=>{
+  let held=0,resumed=0,closed=0;const callbacks:AgentCallbacks[]=[];
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},tool:async()=>({}),route:async input=>({action:input.utterance.includes('Bob')?'listen':'reply',request:input.utterance})},
+    {audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{},pausePlayback:()=>{held++;},resumePlayback:()=>{resumed++;}},cb=>{callbacks.push(cb);return {start:async()=>{},message:()=>{},close:()=>{closed++;}};});
+  session.join(actor);await session.transcript(actor.userId,'Show chemistry courses.');
+  session.partial(actor.userId,'can you tell me');assert.equal(held,1);assert.equal(closed,0);
+  await session.transcript(actor.userId,'Can you tell me your plan, Bob?');assert.equal(closed,0);assert.ok(resumed>0);
+  session.partial(actor.userId,'show me the syllabus');assert.equal(held,2);
+  await session.transcript(actor.userId,'Show me the CHM 113 syllabus instead.');assert.equal(closed,1);assert.equal(callbacks.length,2);session.close();
+});
+
+test('arrival greetings include unconsented humans, queue while busy, and never opt them in',async()=>{
+  const callbacks:AgentCallbacks[]=[],messages:string[]=[];let intakes=0;
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{intakes++;},tool:async()=>({}),route:async input=>({action:'reply',request:input.utterance})},
+    {audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},cb=>{callbacks.push(cb);return {start:async()=>{},message:text=>messages.push(text),close:()=>{}};});
+  session.join(actor);await session.transcript(actor.userId,'Find chemistry classes.');
+  session.arrived(other);assert.equal(messages.length,1);assert.equal(session.accepts(other.userId),false);
+  callbacks[0]!.complete();await new Promise(r=>setTimeout(r,300));
+  assert.equal(messages.length,2);assert.match(messages[1]!,/tiny friendly greeting/);assert.match(messages[1]!,/Bob/);
+  await assert.rejects(()=>callbacks[1]!.tool({tool_name:'research_course',tool_call_id:'forbidden',parameters:{}},new AbortController().signal),/Greeting/);
+  callbacks[1]!.complete();session.arrived(other);await tick();assert.equal(messages.length,2);
+  await session.transcript(other.userId,'Can you hear me?');assert.equal(intakes,1);
+  session.departed(other.userId);session.arrived(other);await tick();assert.equal(messages.length,3);session.close();
+});
+
+test('a departing starter does not interrupt another member’s active answer',async()=>{
+  let callback!:AgentCallbacks,closed=0,plays=0;
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},tool:async()=>({})},
+    {audio:()=>{plays++;},stop:()=>{},finish:()=>{},status:()=>{}},cb=>{callback=cb;return {start:async()=>{},message:()=>{},close:()=>{closed++;}};});
+  session.join(actor);session.join(other);await session.transcript(other.userId,'Ray, show CHM 113.');
+  session.departed(actor.userId);assert.equal(closed,0);assert.equal(session.presence.size,1);
+  callback.audio(Buffer.alloc(8),16000);assert.equal(plays,1);session.close();
+});
+
+test('Discord room ownership follows remaining humans and closes only when the human room is empty',async()=>{
+  const {DiscordVoice}=await import('../src/transport/discord/voice.js');
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},tool:async()=>({})},
+    {audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},()=>({start:async()=>{},message:()=>{},close:()=>{}}));
+  session.join(actor);session.presence.set(other.userId,other);let destroyed=0;
+  const transport=new DiscordVoice({...config,DISCORD_VOICE_CHANNEL_ID:'room'},{} as never,{} as never,()=>({} as never));
+  const live={session,ownerId:actor.userId,connection:{destroy:()=>{destroyed++;}},captures:new Map(),timer:setTimeout(()=>{},10000)};
+  (transport as unknown as {live:unknown}).live=live;
+  transport.departed(actor.userId,null);assert.equal(destroyed,0);assert.equal(live.ownerId,other.userId);assert.equal(session.participants.size,0);
+  transport.departed(other.userId,null);assert.equal(destroyed,1);assert.equal(session.listening,false);
+});
+
+test('real Discord playback pauses and resumes queued speech during question recognition',async()=>{
+  const {createAudioPlayer,AudioPlayerStatus,NoSubscriberBehavior,entersState}=await import('@discordjs/voice');
+  const {DiscordSpeechPlayback}=await import('../src/voice/playback.js');
+  const player=createAudioPlayer({behaviors:{noSubscriber:NoSubscriberBehavior.Play}}),playback=new DiscordSpeechPlayback(player);
+  try{
+    playback.write(Buffer.alloc(32000),16000);await entersState(player,AudioPlayerStatus.Playing,1500);
+    const state=()=>player.state.status;
+    playback.pause();assert.equal(state(),AudioPlayerStatus.Paused);
+    playback.resume();assert.equal(state(),AudioPlayerStatus.Playing);
+    playback.stop();assert.equal(state(),AudioPlayerStatus.Idle);
+  }finally{playback.stop();}
+});
+
+test('a greeting interrupted before audio is retried after the answer, but stop keeps queued greetings quiet',async()=>{
+  const callbacks:AgentCallbacks[]=[],messages:string[]=[];
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},tool:async()=>({})},
+    {audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},cb=>{callbacks.push(cb);return {start:async()=>{},message:text=>messages.push(text),close:()=>{}};});
+  session.join(actor);session.arrived(other);await tick();assert.equal(messages.length,1);
+  await session.transcript(actor.userId,'Ray, show CHM 113.');assert.equal(messages.length,2);
+  callbacks[1]!.complete();await new Promise(r=>setTimeout(r,300));assert.equal(messages.length,3);assert.match(messages[2]!,/Bob/);
+  session.partial(actor.userId,'stop');await new Promise(r=>setTimeout(r,300));assert.equal(messages.length,3);session.close();
+});
