@@ -1,6 +1,6 @@
 # Ray Discord bot: implementation milestones
 
-Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestones 0 and 1 are complete. Milestone 2 implementation and live API checks are in place; its real Discord answer verification is pending. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
+Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestones 0–2 are complete, including live API checks and the user-confirmed Discord catalog answer and semester picker. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
 
 ## 1. Agreed scope
 
@@ -346,7 +346,7 @@ Do not automate ordinary user accounts or pretend webhook/bot messages are disti
 - [x] Detailed milestone plan and readable synthetic conversation prepared.
 - [x] Milestone 0: local foundation, portable configuration, runtime/model/checkpointer checks and scenarios. See verification below.
 - [x] Milestone 1: Discord preference workflow, replay checks, user-confirmed live smoke test and restart persistence.
-- [ ] Milestone 2: implemented; Discord answer verification pending. Original scope: one live catalog path.
+- [x] Milestone 2: live catalog path, readable semester picker, quieter replies and user-confirmed Discord answer.
 - [ ] Milestone 3: bounded parallel research.
 - [ ] Milestone 4: group recommendations, refinement and expanded complex-workflow mock suite.
 - [ ] Milestone 5: Render/Supabase deployment, configuration parity and demo.
@@ -380,4 +380,4 @@ Implemented on `demo`: typed catalog adapter, exact course/semester identity val
 
 Live Spring 2027 API checks: CSE 512 returned zero listings with complete/exhausted coverage. CSE 575 returned two sections with complete coverage: 14703 (Yingzhen Yang) and 20755 (Samira Ghayekhloo). The first had scheduled Monday/Wednesday meetings; the second had no listed meeting times, which remained unknown. Seat counts are only timestamped observations. These are real API results, not fixture fallback data.
 
-The TypeScript build, 16 offline tests, 10 database integration tests and deterministic replay passed. Contract/state tests cover readable semester mapping and ambiguity, base-path preservation, source identity mismatch, unknown/zero seats, absent instructors/times, incomplete/empty searches, source failure and nonparticipant question isolation/deduplication. The deterministic four-student preference replay remains intact. Real Discord rendering/semester-picker verification is pending the user's requested smoke check. Stop before Milestone 3.
+The TypeScript build, 16 offline tests, 10 database integration tests and deterministic replay passed. Contract/state tests cover readable semester mapping and ambiguity, base-path preservation, source identity mismatch, unknown/zero seats, absent instructors/times, incomplete/empty searches, source failure and nonparticipant question isolation/deduplication. The deterministic four-student preference replay remains intact. The user confirmed “The answer and semester picker look good” after the requested private-server smoke check. This verifies the rendered live catalog answer and readable semester autocomplete in Discord. Milestone 2 is complete. Stop before Milestone 3.
