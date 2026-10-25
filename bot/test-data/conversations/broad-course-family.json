@@ -1,0 +1,73 @@
+{
+  "note": "Reproduction of reported planning conversation, synthetic identities; no Discord posts.",
+  "term": "Spring 2027",
+  "actors": [
+    {
+      "userId": "test:ann",
+      "name": "Student A"
+    },
+    {
+      "userId": "test:bhav",
+      "name": "Student B"
+    }
+  ],
+  "messages": [
+    {
+      "userId": "test:ann",
+      "name": "Student A",
+      "id": "test:ann:m0",
+      "content": "i need to take 2 cse 5xx courses",
+      "botMention": false
+    },
+    {
+      "userId": "test:ann",
+      "name": "Student A",
+      "id": "test:ann:m1",
+      "content": "i want simpler courses to take since its my last semester. Have to prep for jobs",
+      "botMention": false
+    },
+    {
+      "userId": "test:ann",
+      "name": "Student A",
+      "id": "test:ann:m2",
+      "content": "really interested in AI and databases and stuff, hate theory and foundations courses",
+      "botMention": false
+    },
+    {
+      "userId": "test:ann",
+      "name": "Student A",
+      "id": "test:ann:m3",
+      "content": "i have work from 9am-12 pm on Mondays, Tuesdays from 9am-4pm and wednesday from 9am-11am",
+      "botMention": false
+    },
+    {
+      "userId": "test:ann",
+      "name": "Student A",
+      "id": "test:ann:m4",
+      "content": "but i prefer takoing morning and noon classes rather than late evening",
+      "botMention": false
+    },
+    {
+      "userId": "test:ann",
+      "name": "Student A",
+      "id": "test:ann:m5",
+      "content": "i want fridays free if possible and thursdays too but worst case i can do thursday",
+      "botMention": false
+    },
+    {
+      "userId": "test:bhav",
+      "name": "Student B",
+      "id": "test:bhav:m0",
+      "content": "I just need one CSE 5xx course and I am good. Just looking for easy courses related to AI.",
+      "botMention": false
+    },
+    {
+      "userId": "test:bhav",
+      "name": "Student B",
+      "id": "test:bhav:m1",
+      "content": "I like to have my classes anytime before 5 PM anyday.",
+      "botMention": false
+    }
+  ],
+  "continuations": []
+}

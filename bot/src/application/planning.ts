@@ -19,19 +19,22 @@ function requireSession(state: PlanningSession | null): PlanningSession {
   if (!state) throw new PlanningError('Start a planning session with /plan start first.');
   return state;
 }
-function summary(session: PlanningSession): string {
+function summary(session: PlanningSession,own=false): string {
   const people = Object.values(session.participants).filter(p => p.active);
   const sections = people.map(person => {
     const facts = Object.values(person.profile.facts).filter((f):f is Fact=>Boolean(f));
     return `${clean(person.name)}${facts.length ? '' : ' — preferences unknown'}\n`
       + facts.map(f => `• ${f.field.replace(/_/g,' ')} [${f.strength}]: ${clean(f.values.join('; ').slice(0,300))}`).join('\n');
   });
-  return `Planning ${semesterName(session.term)} · ${people.length} joined\n\n${sections.join('\n\n')}\n\n`
+  return `${own?'Your planning profile':'Planning'} ${semesterName(session.term)}${own?'':` · ${people.length} joined`}\n\n${sections.join('\n\n')}\n\n`
     + (session.truncated ? 'Older conversation context was truncated; saved profile facts are retained.\n' : '')
     + 'Mention me with a course to check its instructors, meeting times and seats.';
 }
-function attachQuestions(state:PlanningSession,body:Outgoing){
+function attachQuestions(state:PlanningSession,body:Outgoing,discovery=false,failed:string[]=[]){
   for(const person of Object.values(state.participants).filter(p=>p.active)){
+    // Failed extraction is not silence. Optional fields do not gate preliminary discovery.
+    if(failed.includes(person.userId))continue;
+    if(discovery&&(Object.keys(person.profile.facts).length||state.messages.some(m=>m.authorId===person.userId&&!m.ignored)))continue;
     if(state.clarifications.some(q=>q.userId===person.userId&&q.state==='pending'))continue;
     const missing=missingQuestion(person);if(!missing)continue;
     const q={id:randomUUID(),userId:person.userId,...missing,state:'pending' as const,responseId:body.id,messageIds:[]};
@@ -87,7 +90,7 @@ export class PlanningApplication {
       const state = requireSession(tx.state), person = state.participants[actor.userId];
       if (!person?.active) throw new PlanningError('Join planning first to view your stored profile.');
       const own = structuredClone(state); own.participants = { [person.userId]: person };
-      await tx.enqueue(response(summary(own),[actor.userId]),true);
+      await tx.enqueue(response(summary(own,true),[actor.userId]),true);
     });
   }
   async resetProfile(room: Room, eventId: string, actor: Actor): Promise<void> {
@@ -182,7 +185,7 @@ export class PlanningApplication {
       })
       .addNode('extract',async () => {
         if (intent === 'course_question' || !work.participant) return { status: 'no_profile_update' };
-        const people = Object.values(work.snapshot.participants).filter(p => p.active && (intent !== 'profile_update' || p.userId === event.userId));
+        const people = Object.values(work.snapshot.participants).filter(p => p.active && (this.groupPlanner || intent !== 'profile_update' || p.userId === event.userId));
         // Sequential two-person batches bound model concurrency; no DB lock during model calls.
         for (let offset=0; offset<people.length; offset+=2) {
           await Promise.all(people.slice(offset,offset+2).map(async person => {
@@ -192,7 +195,10 @@ export class PlanningApplication {
             try {
               const patch = await this.language.extract(input); validatePatch(patch,input);
               patches.push({ userId: person.userId, patch, cursor: Math.max(...messages.map(m => m.ordinal)) });
-            } catch { failed.push(person.userId); }
+            } catch(error) {
+              failed.push(person.userId);
+              console.error(JSON.stringify({event:'preference_extraction_failed',reason:error instanceof Error&&error.message==='Preference source does not belong to this author.'?'source_validation':error instanceof Error&&error.message==='Conflicting preference strengths.'?'conflicting_strengths':'invalid_or_unavailable_output'}));
+            }
           }));
         }
         return { status: 'extracted' };
@@ -239,7 +245,7 @@ export class PlanningApplication {
       const body = response(summary(state),[event.userId]);
       if (failed.length) body.text += `\nSome profiles could not be validated: ${failed.map(id => clean(state.participants[id]?.name ?? id)).join(', ')}. Their previous facts were retained.`;
       const shouldRecommend=Boolean(this.groupPlanner)&&(intent==='group_planning'||Boolean(state.lastRecommendation));
-      if(!shouldRecommend)attachQuestions(state,body);
+      if(!shouldRecommend)attachQuestions(state,body,Boolean(this.groupPlanner),failed);
       if(shouldRecommend){state.currentRequest=work.requestId;return {snapshot:structuredClone(state),body};}
       await tx.enqueue(body,true);
     });
@@ -259,8 +265,8 @@ export class PlanningApplication {
         delete state.currentRequest;
         state.lastRecommendation={inputVersion:snapshot.version,sectionIds:recommendation.sectionIds,createdAt:new Date().toISOString()};
         body.text=recommendation.text;
-        if(failed.length)body.text+='\nSome profiles could not be updated; their prior facts were retained.';
-        attachQuestions(state,body);
+        if(failed.length)body.text+=`\nI couldn’t process the latest preferences for ${failed.map(id=>clean(state.participants[id]?.name??id)).join(', ')}. Their messages are retained for retry; these results do not fully account for those updates. Use /plan recommend to retry; no need to repeat the preferences.`;
+        attachQuestions(state,body,true,failed);
         body.requestId=event.id;body.replyTo=event.id;
         await tx.enqueue(body,true);
       });

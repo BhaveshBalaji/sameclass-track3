@@ -9,6 +9,17 @@ export const factSchema = z.object({
 export type Fact = z.infer<typeof factSchema>;
 export const patchSchema = z.object({ facts: z.array(factSchema).max(16) });
 export type Patch = z.infer<typeof patchSchema>;
+/** Models may emit one fact per message. Merge supported values rather than dropping the author. */
+export function mergeFactUpdates(patch:Patch):Patch {
+  const groups=new Map<string,Fact>();
+  for(const fact of patchSchema.parse(patch).facts){
+    const prior=groups.get(fact.field);
+    if(prior&&prior.strength!==fact.strength)throw new Error('Conflicting preference strengths.');
+    groups.set(fact.field,prior?{...prior,values:[...new Set([...prior.values,...fact.values])],
+      sources:[...new Map([...prior.sources,...fact.sources].map(s=>[JSON.stringify(s),s])).values()]}:fact);
+  }
+  return patchSchema.parse({facts:[...groups.values()]});
+}
 export type Field = z.infer<typeof fieldSchema>;
 export interface Profile { version: number; facts: Partial<Record<Field, Fact>> }
 export interface Participant { userId: string; name: string; active: boolean; profile: Profile; silenceAsked: boolean; cursor: number }

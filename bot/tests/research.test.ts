@@ -51,11 +51,13 @@ test('syllabus tries exact identity first and labels historical/different-instru
     const u=new URL(String(input));paths.push(u.pathname);
     if(u.pathname==='/api/search')return Response.json(f.catalog);
     if(u.pathname==='/api/syllabus/text')return new Response('',{status:404});
+    if(u.pathname==='/api/syllabus_url')return Response.json({download_url:'https://asu.edu/historical.pdf'});
     return Response.json({status:'ok',requested_term:'2271',source_term:'2267',course:'CSE 575',class_nbr:'88888',instructors:['Other Instructor'],same_professor:false,
       historical:true,warning:'Historical syllabus',search_complete:false,retrieved_at:'2026-10-25T02:00:00+00:00',text:'Exams 40%',pages:[{page:1,text:'Exams 40%'}],truncated:true,extraction_status:'ok'});
   }),new APIClient('https://rmp.test',1000),new ResearchScheduler());
   const recorded:Evidence[]=[];const b=budget(),result=await source.syllabus(task,b,b.signal,e=>recorded.push(e));
-  assert.deepEqual(paths,['/api/search','/api/syllabus/text','/api/syllabus/lookup']);
+  assert.deepEqual(paths,['/api/search','/api/syllabus/text','/api/syllabus/lookup','/api/syllabus_url']);
+  assert.equal(result.sources[0],'https://asu.edu/historical.pdf');
   assert.equal(result.status,'partial');assert.ok(result.limitations.some(s=>/does not match/.test(s)));
   assert.ok(result.limitations.some(s=>/Historical/.test(s)));assert.ok(!result.sources[0]!.includes('#detailsOpen'));
   assert.equal(recorded[0]!.kind,'catalog');

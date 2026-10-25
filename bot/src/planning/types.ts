@@ -7,7 +7,7 @@ export const clock=z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/);
 export const windowSchema=z.object({days:z.array(days).min(1).max(7),start:clock,end:clock,
   startDate:z.iso.date().nullable(),endDate:z.iso.date().nullable(),timezone:z.string()});
 export type TimeWindow=z.infer<typeof windowSchema>;
-export const constraintSchema=z.object({factKey:z.string(),kind:z.enum(['unavailable','campus','allowed_courses','course_credits','semester_credits','course_count','unrestricted_time','other']),
+export const constraintSchema=z.object({factKey:z.string(),kind:z.enum(['unavailable','campus','allowed_courses','course_family','course_credits','semester_credits','course_count','unrestricted_time','other']),
   understood:z.boolean(),values:z.array(z.string()).max(20),min:z.number().nonnegative().nullable(),max:z.number().nonnegative().nullable(),
   windows:z.array(windowSchema).max(20)});
 export type Constraint=z.infer<typeof constraintSchema>;

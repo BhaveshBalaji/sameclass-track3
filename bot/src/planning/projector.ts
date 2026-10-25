@@ -4,15 +4,16 @@ import type {PlanningSession} from '../domain/planning.js';
 import {createModel} from '../model/openrouter.js';
 import {ResearchScheduler} from '../research/scheduler.js';
 import {projectionSchema,type PlanningProjection,type Projection} from './types.js';
+import {includeCourseFamilies} from './course-family.js';
 
 export class ModelPlanningProjection implements PlanningProjection{
-  constructor(private config:Config,private scheduler:ResearchScheduler){}
+  constructor(private config:Config,private scheduler:ResearchScheduler,private transport:typeof fetch=fetch){}
   async project(session:PlanningSession,question:string,signal:AbortSignal):Promise<Projection>{
     const participants=Object.values(session.participants).filter(p=>p.active).map(p=>({userId:p.userId,facts:Object.values(p.profile.facts).map(f=>({field:f!.field,strength:f!.strength,values:f!.values}))}));
     const prompt=JSON.stringify({question:question.slice(0,2000),participants});
     if(prompt.length>this.config.RESEARCH_MAX_INPUT_CHARS)throw new Error('Planning profile input exceeds the configured budget.');
     const request:typeof fetch=(input,init)=>this.scheduler.run('model',signal,async()=>{
-      const result=await fetch(input,{...init,signal:AbortSignal.any([signal,...(init?.signal?[init.signal]:[])])});await result.clone().arrayBuffer();return result;
+      const result=await this.transport(input,{...init,signal:AbortSignal.any([signal,...(init?.signal?[init.signal]:[])])});await result.clone().arrayBuffer();return result;
     });
     const result=await generateText({model:createModel(this.config,[],request),temperature:0,maxRetries:0,maxOutputTokens:3500,abortSignal:signal,
       output:Output.object({schema:projectionSchema}),system:'Compile a planning view from user-authored facts. Stored profile fields are flexible; never discard or invent facts. '
@@ -26,6 +27,9 @@ export class ModelPlanningProjection implements PlanningProjection{
         +'Distinguish credits for ONE course from total semester credits; never require a single class to meet a whole-semester credit target. min/max describe allowed numeric bounds, both 3 for exactly 3 credits. '
         +'Unknown, ambiguous, unsupported and custom hard facts use other or understood:false. Include every hard fact, even one you cannot normalize. '
         +'Use queries for courses explicitly stated in the question or students’ approved lists; do not invent course eligibility. Up to four course lookups. '
+        +'CSE 5xx is a valid broad family: query subject CSE, catalog 5, keyword empty; constrain course_family values ["CSE 5xx"]. Never ask for exact courses to start discovery. '
+        +'Use topic names for search, not words like easy or good professor. AI means artificial intelligence; database interests can use database. '
+        +'Missing campus/credits/degree-approved lists do not prevent preliminary discovery; retain unknowns rather than demanding a complete intake form. '
         +'When only a topic/requirement is known, use a keyword query with empty subject/catalog; requirement fit remains unverified. If no course/topic is known, return no queries. '
         +'Empty arrays, null min/max and no windows are valid when a dimension does not apply.',prompt});
     const projection=projectionSchema.parse(result.output);
@@ -48,6 +52,6 @@ export class ModelPlanningProjection implements PlanningProjection{
         }
       }
     }
-    return projection;
+    return includeCourseFamilies(session,projection);
   }
 }

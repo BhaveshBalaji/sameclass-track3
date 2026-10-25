@@ -25,6 +25,7 @@
     "register:commands": "npm run register:commands --workspace bot",
     "check:research": "npm run check:research --workspace bot --",
     "test:group": "npm run test:group --workspace bot",
-    "check:planning": "npm run check:planning --workspace bot --"
+    "check:planning": "npm run check:planning --workspace bot --",
+    "check:discovery": "npm run check:discovery --workspace bot"
   }
 }

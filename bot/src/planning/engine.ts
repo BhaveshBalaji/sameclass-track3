@@ -6,6 +6,8 @@ import {clean} from '../domain/planning.js';
 import {semesterName} from '../domain/semester.js';
 import type {CourseResearch} from '../application/catalog.js';
 import {matchCandidates} from './matcher.js';
+import {includeCourseFamilies} from './course-family.js';
+import {discoveryRelevance} from './discovery-relevance.js';
 import type {Candidate,GroupPlanner,PlanningCatalog,PlanningProjection,Projection,Recommendation,Section,SoftFitAssessor,PlanningQuery} from './types.js';
 
 export function isGroupRequest(text:string){return /\b(?:together|for (?:all of us|our group)|shared (?:classes|courses|options)|our (?:schedules|requirements)|group plan|plan (?:classes|courses) for us)\b/i.test(text);}
@@ -16,7 +18,7 @@ export class GroupPlanningEngine implements GroupPlanner{
     const signal=AbortSignal.any([parentSignal,AbortSignal.timeout(this.limits.timeoutMs)]);
     let projection:Projection={queries:[],participants:[]},sections:Section[]=[],ranked:Candidate[]=[],notes:string[]=[],sources:string[]=[],evidence:{candidate:Candidate;text:string}[]=[];
     const graph=new StateGraph(new StateSchema({requestId:z.string(),status:z.string()}))
-      .addNode('interpret',async()=>{signal.throwIfAborted();projection=await this.projector.project(session,question,signal);return {status:'interpreted'};})
+      .addNode('interpret',async()=>{signal.throwIfAborted();projection=includeCourseFamilies(session,await this.projector.project(session,question,signal));return {status:'interpreted'};})
       .addNode('catalog',async()=>{
         const campusFacts=projection.participants.flatMap(p=>p.constraints.filter(c=>c.kind==='campus'&&c.understood));
         const online=campusFacts.some(c=>c.values.some(v=>/online/i.test(v)));
@@ -31,6 +33,7 @@ export class GroupPlanningEngine implements GroupPlanner{
           sections.push(...result.value.results);
         }
         sections=[...new Map(sections.map(s=>[`${s.term}:${s.class_nbr}`,s])).values()];
+        sections.sort((a,b)=>discoveryRelevance(session,b)-discoveryRelevance(session,a));
         // Preserve components needed to check shortlisted lectures, even after limiting the number of primary candidates.
         const groups=new Map<string,Section[]>();
         for(const s of sections.filter(s=>!['LAB','REC','DIS'].includes((s.component??'').toUpperCase()))){const key=`${s.subject}:${s.catalog_nbr}:${s.campus}`;groups.set(key,[...(groups.get(key)??[]),s]);}
@@ -43,7 +46,13 @@ export class GroupPlanningEngine implements GroupPlanner{
         sections=[...primary,...sections.filter(s=>ids.has(s.class_nbr)&&!primary.some(p=>p.class_nbr===s.class_nbr))];
         return {status:'retrieved'};
       })
-      .addNode('match',()=>{signal.throwIfAborted();ranked=matchCandidates(session,projection,sections);return {status:'matched'};})
+      .addNode('match',()=>{
+        signal.throwIfAborted();ranked=matchCandidates(session,projection,sections);
+        ranked.sort((a,b)=>Number(b.shared)-Number(a.shared)||b.covered-a.covered
+          ||a.fits.filter(f=>f.status==='conflict').length-b.fits.filter(f=>f.status==='conflict').length
+          ||discoveryRelevance(session,b.section)-discoveryRelevance(session,a.section));
+        return {status:'matched'};
+      })
       .addNode('research',async()=>{
         if(!this.research)return {status:'matched_without_research'};
         const shortlist=ranked.filter(c=>c.fits.some(f=>Object.keys(session.participants[f.userId]!.profile.facts).length>0&&f.status!=='conflict')).slice(0,this.limits.shortlist);
@@ -62,11 +71,17 @@ export class GroupPlanningEngine implements GroupPlanner{
         return {status:'researched'};
       }).addEdge(START,'interpret').addEdge('interpret','catalog').addEdge('catalog','match').addEdge('match','research').addEdge('research',END).compile();
     await graph.invoke({requestId:randomUUID(),status:'started'});signal.throwIfAborted();
-    if(!projection.queries.length)return {text:'Which courses or subject interests should I consider for the group? Each student can share an approved list or elective requirement.',sectionIds:[]};
+    if(!projection.queries.length)return {text:'I couldn’t derive a catalog search from the saved preferences yet. A subject/level such as CSE 5xx, a topic such as AI, or a specific course is enough to start; an approved course list is not required.',sectionIds:[]};
     if(!ranked.length)return {text:'I found no usable section listings in this bounded search. '+notes.join(' ')+' Share another course or broaden the search; your requirements are unchanged.',sectionIds:[]};
     const known=Object.values(session.participants).filter(p=>p.active&&Object.keys(p.profile.facts).length).length;
     const shared=ranked.filter(c=>c.shared),chosen=shared.slice(0,3);
     let text=`**Group options · ${semesterName(session.term)}**\n`;
+    const requests=Object.values(session.participants).filter(p=>p.active).map(p=>{
+      const count=p.profile.facts.course_count?.values.join('; ');
+      const families=Object.values(p.profile.facts).filter(f=>f&&/5xx|[1-9]xx|[1-9]00\s*[-–]/i.test(f.values.join(' '))).flatMap(f=>f!.values);
+      return `${clean(p.name)}${count?`: ${clean(count)}`:''}${families.length?` · ${clean([...new Set(families)].join('; '))}`:''}`;
+    });
+    text+=`Planning for ${requests.join(' | ')}.\n`;
     if(!known)text+='No participant requirements are known yet. These are preliminary catalog options, not verified fits.\n';
     if(!shared.length)text+='No single returned option avoids all known conflicts. I have kept everyone’s hard constraints.\n';
     else text+='These are single-course options, not a complete semester schedule.\n';

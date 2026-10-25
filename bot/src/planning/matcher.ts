@@ -1,5 +1,6 @@
 import type {Participant,PlanningSession} from '../domain/planning.js';
 import type {Candidate,Constraint,Fit,Projection,Section,TimeWindow} from './types.js';
+import {courseFamilies} from './course-family.js';
 
 const canonical=(s:string)=>s.replace(/[^a-z0-9]/gi,'').toUpperCase();
 const campus=(s:string)=>({ASUONLINE:'ONLINE',DOWNTOWNPHOENIX:'DTPHX',DOWNTOWN:'DTPHX',POLYTECHNIC:'POLY'} as Record<string,string>)[canonical(s)]??canonical(s);
@@ -64,6 +65,11 @@ function fit(person:Participant,constraints:Constraint[],section:Section,compone
       hasTime=true;
       if(!c.windows.length){unchecked.push('Availability could not be interpreted');continue;}
       for(const s of components){const result=timeCheck(s,c.windows);if(result.conflict)conflicts.push(`Section ${s.class_nbr} overlaps unavailable time`);else if(result.unknown)unchecked.push(`Section ${s.class_nbr} has unresolved meeting/timezone/date information`);}
+    }else if(c.kind==='course_family'&&fact.strength==='hard'){
+      hasCourse=true;
+      const families=courseFamilies(c.values);
+      if(!families.length)unchecked.push('Course family could not be interpreted');
+      else if(!families.some(f=>section.subject.toUpperCase()===f.subject&&new RegExp(`^${f.prefix}\\d{2}[A-Z]?$`,'i').test(section.catalog_nbr)))conflicts.push(`Outside stated course family: ${c.values.join(', ')}`);
     }else if(c.kind==='allowed_courses'&&fact.strength==='hard'){
       hasCourse=true;if(!c.values.length)unchecked.push('Approved course list is unknown');
       else if(!c.values.some(v=>canonical(v)===canonical(section.subject+section.catalog_nbr)))conflicts.push('Outside stated approved course list');
