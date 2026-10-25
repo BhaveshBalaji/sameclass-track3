@@ -40,6 +40,7 @@ async function main(){
       let settled=false;
       const scribe=new ScribeUtterance(config.ELEVENLABS_API_KEY,text=>{
         settled=true;
+        if(!text.trim()){reject(new Error('Realtime transcription proof returned no speech.'));return;}
         console.log(JSON.stringify({check:'voice_scribe',synthetic:true,transcriptCharacters:text.length,audioBytes:bytes,discordAudioVerified:false}));resolve();
       },()=>{settled=true;reject(new Error('Realtime transcription proof failed.'));});
       // Reuse the generated synthetic answer: no extra speech generation or student audio.

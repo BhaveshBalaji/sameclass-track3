@@ -46,6 +46,8 @@ Successful client-tool results explicitly send `is_error:false`, as required by 
 
 Reconnecting waits for the previous socket's close acknowledgement and a short provider-cleanup interval, since the development workspace allows only one active conversation. During debugging, `VOICE_DIAGNOSTICS=true` logs capture phases, packet/PCM counts and transcription character counts; it does not log transcripts, audio or credentials. Leave it false for routine use. If repeated speech keeps interrupting Ray before an answer, use headphones and test one complete question followed by a quiet pause.
 
+Scribe uses speech-based VAD to finalize utterances rather than relying solely on Discord's silence-packet behavior. Explicit receiver end and the 30-second cap can also commit a turn. Empty transcription results release capture immediately and do not become notes, so a quiet or unrecognized turn cannot block subsequent speech.
+
 Automatic proactive suggestions are deferred. Complete the two-person audio/source/interruption checks and the checklist's two rehearsals before marking voice milestones complete. No live source answers are replaced by demo fixtures.
 
 If Ray is present and shows **listening** but stays quiet after “Hello,” address it explicitly: **“Hey Ray, what have you noted for me?”** Ordinary discussion is retained as pending notes without a spoken reply. A spoken response is triggered by addressing Ray or a same-speaker follow-up within the active window. Pause, leave, reset and a topic handoff close that window. The listening notice now states the wake phrase, and unaddressed speech updates status with the same hint.

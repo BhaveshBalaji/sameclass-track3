@@ -130,7 +130,7 @@ export class DiscordVoice {
     const receive=live.connection.receiver.subscribe(userId,{end:{behavior:EndBehaviorType.AfterSilence,duration:700}});
     const decoder=new SpeechDecoder();let scribe:ScribeUtterance|undefined,pending:Buffer[]=[],bytes=0,voiced=0,ended=false,closed=false;
     const close=()=>{if(closed)return;closed=true;clearTimeout(timeout);receive.destroy();decoder.close();scribe?.close();live.captures.delete(userId);};
-    const timeout=setTimeout(()=>{receive.destroy();scribe?.finish();},30000);
+    const timeout=setTimeout(()=>{ended=true;receive.destroy();if(scribe)scribe.finish();else close();},30000);
     live.captures.set(userId,close);
     receive.on('error',(error)=>{this.diagnostic('receive_error',{captureId,packets,pcmBytes,type:error.name});close();});
     receive.on('data',(packet:Buffer)=>{
@@ -147,7 +147,7 @@ export class DiscordVoice {
     if(!actor||!await this.backend(live.room,live.sessionId).authorized(actor)||closed||this.live!==live){close();return;}
     scribe=new ScribeUtterance(this.config.ELEVENLABS_API_KEY,text=>{
       this.diagnostic('transcript_completed',{captureId,characters:text.length,packets,pcmBytes});
-      close();if(this.live===live&&live.session.accepts(userId))void live.session.transcript(userId,text).catch(()=>{});
+      close();if(text&&this.live===live&&live.session.accepts(userId))void live.session.transcript(userId,text).catch(()=>{});
     },()=>{this.diagnostic('transcription_failed',{captureId,packets,pcmBytes});close();if(this.live===live)void live.status?.edit({content:'Voice transcription failed. Please try again or use text.',allowedMentions:{parse:[]}}).catch(()=>{});});
     for(const pcm of pending)scribe.write(pcm);pending=[];
     if(ended)scribe.finish();

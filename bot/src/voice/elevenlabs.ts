@@ -145,7 +145,8 @@ export class ScribeUtterance {
     socketFactory: SocketFactory = createSocket) {
     const url = new URL('wss://api.elevenlabs.io/v1/speech-to-text/realtime');
     url.search = new URLSearchParams({ model_id: 'scribe_v2_realtime', audio_format: 'pcm_16000',
-      sample_rate: '16000', commit_strategy: 'manual', language_code: 'en' }).toString();
+      sample_rate: '16000', commit_strategy: 'vad', vad_silence_threshold_secs:'0.7',
+      min_speech_duration_ms:'100',min_silence_duration_ms:'100',language_code: 'en' }).toString();
     for(const term of ['Ray','ASU','CSE'])url.searchParams.append('keyterms',term);
     this.socket = socketFactory(url.toString(), { 'xi-api-key': key });
     const fail = () => { if (this.closed) return; this.close(); failed(); };
@@ -163,7 +164,9 @@ export class ScribeUtterance {
           this.queue = []; this.bytes = 0;
           if (this.finished) this.commit();
         } else if (event.message_type === 'committed_transcript') {
-          this.close(); const text = String(event.text ?? '').trim().slice(0,4000); if (text) final(text);
+          // Empty speech is still a terminal result: the caller must release
+          // its member capture slot rather than wait forever for another turn.
+          this.close(); const text = String(event.text ?? '').trim().slice(0,4000); final(text);
         } else if (/error|insufficient|quota|rate_limited|auth|timeout/.test(event.message_type ?? '')) fail();
       } catch { fail(); }
     });

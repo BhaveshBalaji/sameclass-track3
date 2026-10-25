@@ -91,6 +91,16 @@ test('Scribe buffers before readiness and returns only completed transcripts',()
   socket.event({message_type:'partial_transcript',text:'wrong partial'});assert.equal(transcripts.length,0);
   socket.event({message_type:'committed_transcript',text:'Hey Ray, hello.'});assert.deepEqual(transcripts,['Hey Ray, hello.']);
 });
+test('an empty Scribe result still releases the caller capture exactly once',()=>{
+  const socket=new Socket(),results:string[]=[];
+  const scribe=new ScribeUtterance('synthetic',text=>results.push(text),()=>assert.fail('unexpected failure'),url=>{
+    assert.equal(new URL(url).searchParams.get('commit_strategy'),'vad');return socket as unknown as WebSocket;
+  });
+  socket.event({message_type:'session_started'});
+  socket.event({message_type:'committed_transcript',text:'   '});
+  socket.event({message_type:'committed_transcript',text:'late'});
+  assert.deepEqual(results,['']);assert.equal(socket.readyState,3);scribe.close();
+});
 
 test('the next agent waits for the prior socket to close in a one-conversation workspace',async()=>{
   const first=new Socket(),second=new Socket();let requests=0;
