@@ -1,6 +1,6 @@
-# Ray · local foundation
+# Ray · local Discord planning bot
 
-Milestone 0 implements reproducible local startup, configuration, API health clients, versioned Postgres migrations, LangGraph checkpoint persistence, and explicit OpenRouter capability checks. The worker deliberately does **not** log in to Discord or implement sessions/recommendations yet; those begin in Milestone 1.
+Milestones 0–1 implement local startup, portable configuration, Postgres persistence, and Discord group preference intake through LangGraph and OpenRouter. Ray collects and summarizes separate student profiles. Course, syllabus and professor research is visibly disconnected until later milestones; this version does not recommend sections.
 
 ## Setup and start
 
@@ -18,7 +18,7 @@ If `.env` does not exist, copy `.env.example` to `.env`. If it already exists, a
 npm run dev
 ```
 
-This command starts the repo's Postgres container, applies application/checkpointer migrations, starts both existing FastAPI apps, waits for health, then starts the foundation worker. It uses:
+This command starts the repo's Postgres container, applies application/checkpointer migrations, starts both existing FastAPI apps, waits for health, then starts the Ray Gateway worker. It uses:
 
 | Service | Local address |
 | --- | --- |
@@ -51,7 +51,7 @@ The model probe makes three successful calls in the tested path: schema-valid au
 
 The validated baseline has `OPENROUTER_REASONING_EFFORT=none`. Two preliminary low-effort runs were inconsistent within the small output caps (including no structured final output). This is a bounded-probe limitation, not proof that reasoning is unsupported. Evaluate reasoning/output budgets per role before enabling it in later milestones. Hiding reasoning text does not disable reasoning or its billing.
 
-Application migrations live in `bot/migrations`, with transaction boundaries, checksums and a migration lock. Never edit applied SQL; add a new numbered migration. The LangGraph package owns its version-pinned schema migrations through `PostgresSaver.setup()`. `db:migrate` is an explicit initialization step, not a network-time operation inside the worker. App tables live in `ray_app`; graph tables live in `ray_checkpoints`. Probe data is removed after checks; development state is otherwise retained. Discord session/profile tables arrive in Milestone 1.
+Application migrations live in `bot/migrations`, with transaction boundaries, checksums and a migration lock. Never edit applied SQL; add a new numbered migration. The LangGraph package owns its version-pinned schema migrations through `PostgresSaver.setup()`. `db:migrate` is an explicit initialization step, not a network-time operation inside the worker. App tables live in `ray_app`; graph tables live in `ray_checkpoints`. Probe data is removed after checks; development state is otherwise retained. Session, profile, event-deduplication and delivery-outbox tables are included in migration 002.
 
 For a built worker, start the APIs and database first, run migrations, then:
 
@@ -71,6 +71,38 @@ The local supervisor manages only default local API URLs. Configured custom API 
 2. Enable **Message Content Intent**. The client will request Guilds, GuildMessages and MessageContent; a join-button roster does not require the member intent.
 3. Install with bot and application-command scopes; allow View Channel, Read Message History, Send Messages and Embed Links in the configured planning channel.
 4. Set the token, application ID, guild ID and comma-separated planning channel IDs in the ignored `.env`. Keep the token out of Git, screenshots and chat.
-5. Milestone 1 registers development-guild `/ping`, `/plan` and `/ask` interactions and verifies acknowledgements, actual mention metadata and persistent buttons. This milestone's worker does not register commands, send messages or require a token.
+5. Run `npm run register:commands` once (and after command-definition changes), then `npm run dev`. Registration upserts only Ray's three command names in your configured server. Startup connects the Gateway when a token is present; an incomplete Discord configuration fails clearly. Without a token, the worker runs foundation health checks only.
 
-The prepared [four-student scenarios](../docs/mock-chat-scenarios.md) remain the behavior specification. Their machine-readable replay and the complete preference workflow are Milestone 1 work; the later expanded scenario suite remains Milestone 4.
+## Try the preference workflow
+
+In the configured server text channel:
+
+1. Run `/ping`, then `/plan start term:2271` (Spring 2027).
+2. Each student, including the creator, clicks **Join planning**. A session is a shared workspace in this existing channel. Up to 12 students can join with separate profiles.
+3. Post your requirements naturally. Ordinary messages from joined students are retained but produce no reply or model call.
+4. Mention the actual **@Ray** account to summarize the group. Ray extracts each author's own hard constraints, soft preferences and explicit flexibility, preserving unknowns. A name typed as plain text is not a Discord mention.
+5. Answer a follow-up with Discord's **Reply** action to the bot message; the intended author need not mention Ray again. Silent participants are asked once.
+6. Use `/plan status`, `/plan profile`, `/plan reset-profile` or `/plan reset-session`. Profile/status output appears in the planning channel; command acknowledgements are ephemeral. Session reset requires creator/moderator permission and an actor-bound confirmation valid for five minutes.
+
+**Leave planning** stops future intake. Your own reset removes saved facts and retained source messages; session reset removes all session profiles/context. Resets invalidate in-flight results. Graph checkpoints contain request IDs/status, not student messages or profiles. Already-posted Discord responses remain in channel history.
+
+`/ask question:...` and course-information mentions work without joining, return an explicit research-disconnected notice, and do not modify profiles. Catalog answers start in Milestone 2; syllabus/RMP answers start in Milestone 3.
+
+Context defaults to 100 messages / 30,000 characters, with individual input capped at 4,000 characters. Configure `PLANNING_MAX_MESSAGES`, `PLANNING_MAX_CHARACTERS` and `PLANNING_MAX_PARTICIPANTS` as needed (12 participants maximum). Saved facts outlive the rolling context and retain up to 12 evidence quotes per field. Displayed fact values are abbreviated. A newer message arriving during extraction invalidates the older snapshot; mention Ray again to refresh.
+
+Gateway buttons, profiles and pending clarification references persist through restart. Uncertain sends are not blindly retried; explicitly request a fresh status/summary if a send cannot be confirmed. Run one worker per database namespace in this initial local version. Do not start concurrent workers against the live Discord namespace.
+
+## Synthetic replay and verification
+
+```bash
+npm test                      # 10 offline foundation/transport-contract checks
+npm run test:planning         # real Postgres state and delivery regression tests
+npm run replay                # deterministic four-student application replay
+npm run replay -- --live      # opt-in paid OpenRouter replay with synthetic students
+```
+
+Replay uses the same application handlers as Discord, synthetic identities and an isolated local `ray_m1_test` database. It never posts fixtures to Discord. A remote test database must be explicitly configured with `RAY_TEST_DATABASE_URL` and have `test` in its name; replay is disabled in production. Replay state/checkpoints are removed afterward. These deterministic fixtures are tests, never automatic fallback data for real students.
+
+The [readable four-student scenarios](../docs/mock-chat-scenarios.md) and `bot/test-data/conversations/four-students.json` cover author isolation, a silent participant, direct replies, corrections and question isolation. Milestone 4 expands this suite to complex workflows and evidence failures.
+
+The live synthetic OpenRouter replay and Gateway connection passed. Human command/mention/direct-reply and post-restart checks in the private test server remain required before declaring Milestone 1 complete.

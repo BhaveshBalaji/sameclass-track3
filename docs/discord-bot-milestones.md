@@ -1,6 +1,6 @@
 # Ray Discord bot: implementation milestones
 
-Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestone 0 local foundation is implemented; Discord interaction implementation has not started. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
+Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestone 0 local foundation and Milestone 1 implementation are in place. Milestone 1 real-server workflow verification is pending. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
 
 ## 1. Agreed scope
 
@@ -343,7 +343,7 @@ Do not automate ordinary user accounts or pretend webhook/bot messages are disti
 - [x] Current Discord guidance retrieved through Context7 MCP and official references.
 - [x] Detailed milestone plan and readable synthetic conversation prepared.
 - [x] Milestone 0: local foundation, portable configuration, runtime/model/checkpointer checks and scenarios. See verification below.
-- [ ] Milestone 1: complete Discord and preference workflow.
+- [ ] Milestone 1: implemented; real Discord workflow and restart smoke verification pending.
 - [ ] Milestone 2: one live catalog path.
 - [ ] Milestone 3: bounded parallel research.
 - [ ] Milestone 4: group recommendations, refinement and expanded complex-workflow mock suite.
@@ -363,3 +363,11 @@ Implemented on branch `demo`, October 24, 2026 (America/Phoenix). [Setup and com
 - TypeScript build, existing 49 Python tests and Python lint passed. No secret values, raw reasoning, live review comments or syllabus files are stored in the verification record.
 
 Stop before Milestone 1. Discord credentials/setup and real Discord interaction checks belong to that next milestone.
+
+## Milestone 1 verification
+
+Implemented on `demo`: Gateway intake, guild/channel allowlisting, `/ping`, `/ask`, `/plan` controls, persistent actor-bound session buttons, joined-user profiles, bounded message context, author-owned extraction and source validation, clarification replies, version guards and a transactional delivery outbox. The creator must join explicitly. Leave stops future intake; reset invalidates in-flight requests and removes retained profile/source state. Graph checkpoints store request IDs/status only and cannot restore erased facts. Already-posted Discord messages are not deleted by a profile/session reset.
+
+The fixture replay uses four synthetic students in a separate `ray_m1_test` database. Offline checks and database regression tests cover wrong-author replies, duplicate events, stale work, resets, delivery uncertainty and cancelled participation questions. The live OpenRouter/DeepSeek/Relace replay passed author isolation, hard/soft facts, explicit flexibility, silent-participant replies and correction retention. Synthetic fixtures are opt-in test inputs, never a product fallback. The extraction prompt was clarified after the initial live replay omitted facts; broader model regression scenarios remain Milestone 4.
+
+Discord commands were registered and the Gateway connected successfully to the configured test server/channel. Human `/ping`, start/join, actual mention, clarification reply and post-restart checks remain pending; do not call this milestone complete before those pass. Course, syllabus and RMP answers intentionally remain disconnected here. Stop before Milestone 2.

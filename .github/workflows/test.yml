@@ -39,3 +39,5 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run check:db
+      - run: npm run test:planning
+      - run: npm run replay

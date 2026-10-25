@@ -9,12 +9,15 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test tests/foundation.test.ts tests/planning-unit.test.ts",
     "start": "node dist/src/worker.js",
     "doctor": "tsx scripts/doctor.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "check:db": "tsx scripts/check-db.ts",
-    "check:model": "tsx scripts/check-model.ts"
+    "check:model": "tsx scripts/check-model.ts",
+    "test:planning": "tsx --test tests/planning.test.ts",
+    "replay": "tsx scripts/replay.ts",
+    "register:commands": "tsx scripts/register-commands.ts"
   },
   "dependencies": {
     "@langchain/langgraph": "1.5.2",

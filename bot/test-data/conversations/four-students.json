@@ -1,0 +1,102 @@
+{
+  "term": "2271",
+  "actors": [
+    {
+      "userId": "test:maya",
+      "name": "Maya"
+    },
+    {
+      "userId": "test:leo",
+      "name": "Leo"
+    },
+    {
+      "userId": "test:nina",
+      "name": "Nina"
+    },
+    {
+      "userId": "test:dev",
+      "name": "Dev"
+    }
+  ],
+  "messages": [
+    {
+      "id": "test:m01",
+      "userId": "test:maya",
+      "name": "Maya",
+      "content": "For Spring 2027, I'm looking for one 3-credit elective in Tempe. My approved choices are CSE 511 or CSE 512. I cannot attend before noon on weekdays; all weekday times after noon work. I prefer database or distributed-systems topics and project-based assessment.",
+      "botMention": false
+    },
+    {
+      "id": "test:m02",
+      "userId": "test:leo",
+      "name": "Leo",
+      "content": "Same semester: one 3-credit Tempe elective. My approved choices are CSE 512 or CSE 575. I cannot attend Tuesday or Thursday from 2\u20136 PM. All other weekday times work. I prefer machine learning/data topics and fewer high-stakes exams.",
+      "botMention": false
+    },
+    {
+      "id": "test:m03",
+      "userId": "test:nina",
+      "name": "Nina",
+      "content": "I need one 3-credit Tempe elective from my list: CSE 511 or CSE 512. I cannot attend Monday or Wednesday after 4 PM; other weekday times work. I prefer mornings and team projects, but mornings are a preference, not a requirement.",
+      "botMention": false
+    },
+    {
+      "id": "test:m04",
+      "userId": "test:leo",
+      "name": "Leo",
+      "content": "Let's compare options after lunch.",
+      "botMention": false
+    },
+    {
+      "id": "test:m05",
+      "userId": "test:maya",
+      "name": "Maya",
+      "content": "@Ray, check our preferences above and find sections we could take together. Give alternatives if one section doesn't work for everyone.",
+      "botMention": true
+    }
+  ],
+  "continuations": [
+    {
+      "id": "test:m06",
+      "userId": "test:dev",
+      "name": "Dev",
+      "content": "Anything works for me, any weekday time is fine. I just need my database elective requirement done.",
+      "replyFor": "test:dev"
+    },
+    {
+      "id": "test:m07",
+      "userId": "test:dev",
+      "name": "Dev",
+      "content": "For my requirement, my approved list is CSE 511 or CSE 512. I also need 3 credits in Tempe.",
+      "replyFor": "test:dev"
+    },
+    {
+      "id": "test:m08",
+      "userId": "test:maya",
+      "name": "Maya",
+      "content": "Correction: I also cannot do Tuesdays at all. My other preferences stay the same.",
+      "botMention": false
+    },
+    {
+      "id": "test:m09",
+      "userId": "test:nina",
+      "name": "Nina",
+      "content": "Maya probably wants early mornings now.",
+      "botMention": false
+    },
+    {
+      "id": "test:m10",
+      "userId": "test:maya",
+      "name": "Maya",
+      "content": "@Ray refresh our shared course preferences using our corrections.",
+      "botMention": true
+    },
+    {
+      "id": "test:m11",
+      "userId": "test:leo",
+      "name": "Leo",
+      "content": "@Ray what is CSE 512 about and what does its syllabus say?",
+      "botMention": true
+    }
+  ]
+}

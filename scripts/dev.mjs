@@ -1,4 +1,4 @@
-/** One local startup command; no Discord login or message handling before Milestone 1. */
+/** Local database, APIs and Ray Gateway worker; host URLs remain configurable. */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
