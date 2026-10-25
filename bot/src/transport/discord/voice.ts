@@ -10,6 +10,7 @@ import { ScribeUtterance } from '../../voice/elevenlabs.js';
 import { VoiceSession, type VoiceBackend } from '../../voice/session.js';
 
 export const voiceNotice = 'Voice Ray sends opted-in audio to ElevenLabs for transcription and conversation. '
+  + 'Say “Hey Ray” followed by your question; ordinary group discussion is noted quietly. '
   + 'Saved planning notes may also be processed by OpenRouter. Use /voice join consent:True to opt yourself in, '
   + '/voice leave to stop including yourself. Session owner/moderators can pause or end listening. '
   + 'Ray does not save raw audio locally; provider transcript retention is separate.';

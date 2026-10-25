@@ -73,6 +73,7 @@ export class VoiceSession {
     } finally {this.admissions.delete(admission);}
     if (!addressed && !followup) {
       if (this.followup?.userId !== userId) this.followup = undefined;
+      this.output.status('listening — say “Hey Ray” to ask a question');
       return;
     }
     if(this.turns>=this.config.VOICE_MAX_TURNS){this.pause();this.output.status('Voice question budget reached. End/rejoin for a new session or use text.');return;}

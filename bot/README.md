@@ -46,6 +46,8 @@ Successful client-tool results explicitly send `is_error:false`, as required by 
 
 Automatic proactive suggestions are deferred. Complete the two-person audio/source/interruption checks and the checklist's two rehearsals before marking voice milestones complete. No live source answers are replaced by demo fixtures.
 
+If Ray is present and shows **listening** but stays quiet after “Hello,” address it explicitly: **“Hey Ray, what have you noted for me?”** Ordinary discussion is retained as pending notes without a spoken reply. A spoken response is triggered by addressing Ray or a same-speaker follow-up within the active window. Pause, leave, reset and a topic handoff close that window. The listening notice now states the wake phrase, and unaddressed speech updates status with the same hint.
+
 Milestones 0–3 implement local startup, portable configuration, Postgres persistence, Discord preference intake and LLM-driven course research. LangGraph coordinates a planner, bounded research workers and an answer writer. DeepSeek through OpenRouter/Relace selects relevant research tasks; the AI SDK tool loop calls scoped ASU/RMP tools. Shared schedule recommendations remain Milestone 4 work.
 
 ## Setup and start
