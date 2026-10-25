@@ -178,7 +178,9 @@ The trace exposed an observed `E-RAY` wake-phrase transcription variant and a pr
 
 Further capture traces showed some utterances persisting to the 30-second cap despite packet gaps. Switched Scribe to speech-based VAD commits while retaining the explicit end/deadline commit. Also fixed an empty-transcript terminal path that closed Scribe without notifying the caller, potentially leaving the member's capture slot occupied indefinitely. Empty results now always release capture and never become profile evidence. Twelve voice regressions and build passed; a new live agent/tool/speech/VAD transcription proof passed with 253,440 PCM bytes and a 144-character synthetic transcript. The listening worker was reloaded for the user's next real check; human playback is still pending.
 
-- [ ] V0: live agent/tool/speech/transcription, one participant's real microphone transcription and empty-channel Discord playback proved; human hearing, two-speaker isolation and interruptions pending.
+After rejoining and asking the notes read-back question once, the user explicitly confirmed **“Ray answered aloud.”** This establishes the basic real Discord microphone → transcription → local notes tool → agent speech → human-audible playback path for one participant on this code. Keep Ray running for further testing. This single confirmation does not verify two-speaker isolation, course-source follow-ups, interruption recovery, named group recommendations or the two full rehearsals.
+
+- [ ] V0: one participant's complete real microphone/notes-tool/spoken-answer path confirmed by the user; two-speaker isolation and interruptions pending.
 - [ ] V1: course tool and follow-up code tested; live spoken questions pending.
 - [ ] V2: separate notes/corrections/reset tested with isolated Postgres; live speaker recognition and read-back pending.
 - [ ] V3: named allocation presentation and stale-result guards tested; live group readout pending.

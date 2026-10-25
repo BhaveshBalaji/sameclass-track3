@@ -2,7 +2,7 @@
 
 ## Voice Ray (implemented; live acceptance pending)
 
-Voice is off by default in the checked-in configuration. The local runtime key has now been supplied, and voice is enabled in the ignored `.env` with the dedicated agent and **General** voice channel configured. Live agent/tool/generated-speech and realtime transcription checks passed, as did an empty-channel Discord connection and silent-playback proof. Commands are registered and the worker has been started. The two-person conversation/interruption checks and full rehearsals remain pending; these transport checks do not establish that humans hear or are attributed correctly. See [V0–V4 evidence](../docs/voice-ray-milestones.md).
+Voice is off by default in the checked-in configuration. The local runtime key has now been supplied, and voice is enabled in the ignored `.env` with the dedicated agent and **General** voice channel configured. Live agent/tool/generated-speech and realtime transcription checks passed, as did an empty-channel Discord connection and silent-playback proof. The user subsequently confirmed an audible reply to a real microphone notes-read-back request. Commands are registered and the worker is running. Two-person attribution, course follow-ups, interruptions and full rehearsals remain pending. See [V0–V4 evidence](../docs/voice-ray-milestones.md).
 
 The ElevenLabs plugin created a dedicated development agent. Its nonsecret ID and tool/voice configuration are in `bot/voice-agent.json`; it requires authentication, has voice recording disabled and agent transcript retention set to one day. Separate Scribe transcription has its own provider retention policy; zero retention is not claimed. A plugin login does not automatically give the local worker an API key.
 
