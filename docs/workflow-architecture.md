@@ -1,10 +1,10 @@
-# SameSection workflow and architecture
+# CourseCrew workflow and architecture
 
 Status: the team accepted the recommended direction on October 24, 2026. Use [Discord bot milestones](discord-bot-milestones.md) as the canonical build checklist. This document explains the architecture; it does not report implemented bot functionality.
 
 ## Product workflow
 
-1. Students use a private text channel in a Discord server with SameSection installed. An ordinary Discord bot cannot join a group DM. See [Discord's bot account restrictions](https://docs.discord.com/developers/topics/oauth2#bot-vs-user-accounts).
+1. Students use a private text channel in a Discord server with CourseCrew installed. An ordinary Discord bot cannot join a group DM. See [Discord's bot account restrictions](https://docs.discord.com/developers/topics/oauth2#bot-vs-user-accounts).
 2. Establish a planning session, semester, participant roster, and model-processing notice. Students explicitly use Join planning; a channel's accessible members are not automatically its participants.
 3. Students discuss requirements, hard constraints, soft preferences, and explicit flexibility naturally. Store bounded session messages without calling a model for every message.
 4. An actual mention of the assistant triggers a request. Deterministic code recognizes actual mention metadata or a reply to an outstanding clarification addressed to its author.
@@ -12,7 +12,7 @@ Status: the team accepted the recommended direction on October 24, 2026. Use [Di
 6. Research useful options for students with enough information. Identify which students each preliminary recommendation covers and which dimensions remain unchecked.
 7. If a registered fourth participant has said nothing, answer for the other three and ask that participant once whether they want to supply requirements. Silence remains unknown; do not repeatedly ping them.
 8. If the fourth participant replies to the clarification, continue that interaction without requiring another mention. Unrelated messages do not trigger replies.
-9. Individual course questions mention their requester in the response and do not silently change their plan or preferences.
+9. Individual questions through `/ask question:<text>` or an actual mention are available to authorized users without joining group planning. Use the explicit or active-session term, clarify missing scope when necessary, mention the requester, and do not change their profile, plan or roster membership. Dispatch only the course/syllabus/review tools needed.
 
 Explicit flexibility is dimension-specific. “Any time works; I only need a database elective” expresses unrestricted timing and a requirement; it does not establish that every candidate fulfills that requirement. If a category's approved courses are unavailable, label fulfillment unchecked and request the missing rule/list when necessary.
 
@@ -52,7 +52,7 @@ The initial implementation has only the Discord adapter. The future adapter is a
 - Own sessions, roster, bounded context, profiles, clarification state, request routing, and state persistence.
 - Own the coordinator, model prompts and schemas, bounded research scheduler, evidence cache, typed API clients, deterministic matching, and evidence-linked response construction.
 - Persist source-message references, request/profile versions, and a conversation snapshot marker. Check for superseding requests or newer relevant state before applying results or presenting them as current. The exact update/rerun policy remains to be settled.
-- Use TypeScript, validated schemas, and SQLite as specified in the original brief; preserve the working Python retrieval services through typed HTTP adapters. An additional orchestration framework is not required by this workflow.
+- Use TypeScript, LangGraph.js for the stateful workflow, validated schemas, and Postgres for application state/checkpoints. Develop against local Postgres first, then Supabase Postgres using the same migrations and persistence contracts. Preserve the Python services behind typed adapters with configurable API base URLs. The latest user decision restores local-first development; do not require hosted resources to begin.
 - Own authorization rules: an authenticated participant may change only their own profile; a quoted statement from someone else is evidence of neither consent nor preference.
 
 ### Existing Python services
@@ -80,7 +80,9 @@ Different platforms are different identity namespaces. A future web account must
 
 ## Coordinator and subagents
 
-The requested agent-with-subagents backend is feasible. A subagent is an independent, bounded model invocation with scoped evidence/tools and validated output, not necessarily a separately deployed service or an agent permanently assigned to every student.
+LangGraph.js is the proposed stateful orchestration framework for the requested agent-with-subagents backend, supplying explicit branching, parallel execution and persisted pause/resume. Application code still enforces authorization, per-provider limits and idempotent external effects. A subagent is an independent, bounded model invocation with scoped evidence/tools and validated output, not necessarily a separately deployed service or an agent permanently assigned to every student.
+
+OpenRouter supplies model inference for the coordinator, preference extractor, syllabus/review workers and final synthesis. The initial candidate is `deepseek/deepseek-v4.1-flash-1017` pinned to the `relace` provider, with automatic provider fallback disabled. Application code still executes tools, enforces authorization and concurrency, and computes compatibility. Keep role configurations separate and validate model outputs with Zod. The [milestone plan's model-backbone section](discord-bot-milestones.md#openrouter-model-backbone) records routing, capability checks and the model-selection rationale; advertised support is not live verification of our application.
 
 1. Classify the question and resolve the relevant profile snapshot.
 2. Call catalog retrieval as ordinary code to resolve sections and instructor names.
@@ -110,7 +112,7 @@ Workers receive only the scope they need, not the entire raw group conversation.
 
 ## Adding an owned chat UI later
 
-Reuse unchanged: the application core, SQLite state services, profile schemas, research workers, scheduler, typed Python API adapters, matching, and structured evidence responses.
+Reuse unchanged: the application core, Postgres state services, profile schemas, research workers, scheduler, typed Python API adapters, matching, and structured evidence responses.
 
 Add: sign-in, room creation/membership, message storage/intake endpoints, validated mention UI, response delivery through WebSocket or SSE, and a web renderer. Route those endpoints through the same application authorization and request workflow.
 
@@ -118,11 +120,12 @@ No browser framework, web auth provider, separate message broker, or browser-fac
 
 ## Build sequence
 
+0. **Milestone 0 — Local foundation and portability:** establish local bot/APIs/Postgres startup, migrations, configurable endpoints and model/checkpointer compatibility. Keep hosted deployment configuration separate from application logic.
 1. **Milestone 1 — Discord and preference workflow:** establish the portable contracts, persistence, explicit sessions and roster, bounded history, triggers, author-scoped profiles/corrections, clarification/reply routing, status/reset, idempotency, and request versions. Course research remains visibly disconnected. Verify and stop before Milestone 2, as required by the supplied brief.
 2. **Milestone 2 — One live research path:** instructor and seat information for one specified course/term through the existing catalog API, with source identity and timestamps.
 3. **Milestone 3 — Parallel research:** bounded scheduler, exact-offering syllabus agents, resolved-instructor review agents, result envelopes, partial failure, caching/deduplication, and operational logs.
-4. **Milestone 4 — Group matching:** shared/individual options and refinement, with unknowns, hard/soft constraints, historical labels, and backup sections.
-5. **Milestone 5 — Verification and demo:** real group exercise plus failure scenarios; distinguish offline tests, live upstream tests, and live Discord checks.
+4. **Milestone 4 — Group matching and extended tests:** shared/individual options and refinement, with unknowns, hard/soft constraints, historical labels, backup sections and a later-stage complex-workflow mock regression suite.
+5. **Milestone 5 — Deploy and demo:** deploy the verified app to Render/Supabase using the same migrations and configured URLs; check restart/recovery and representative local/deployed scenario parity. Distinguish offline tests, live upstream tests and live Discord checks.
 6. **Optional owned UI:** implement a web adapter against the shared contracts; verify the same behavior scenarios through both transports.
 
 ## Behavioral acceptance scenarios
@@ -145,5 +148,5 @@ No browser framework, web auth provider, separate message broker, or browser-fac
 - Explicit join buttons and model-processing notice establish the roster, including the silent fourth student.
 - Recommendations are section shortlists with shared and individual options; full semester optimization is deferred.
 - An optional owned UI uses independent rooms and the shared backend.
-- Start with ASU graduate CS elective planning and develop locally before persistent hosting.
-- Use the milestone plan for initial task limits, focused tests, synthetic conversations and handoff criteria. Choose exact dependency/model configuration in Milestone 0 and the host/budget at deployment.
+- Start locally with ASU graduate CS elective planning: Node.js Discord/coordinator process, both existing Python APIs and local Postgres for application state/LangGraph checkpoints. Later target a Render background worker, one private Render backend for both APIs and Supabase Postgres, changing configuration/packaging rather than domain logic.
+- Use the milestone plan for initial task limits, early focused tests, later complex-workflow mock scenarios and handoff criteria. Verify local dependency/model/checkpointer compatibility in Milestone 0; validate hosting access/costs and deploy in Milestone 5.

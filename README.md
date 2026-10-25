@@ -9,6 +9,10 @@ This repository contains the course-research backend for SameClass: two independ
 | [class_search_api](class_search_api/) | Live ASU sections, all original search filters, subjects, complete course details, prerequisites, current/historical syllabus resolution, document download and text extraction | 8000 |
 | [rmp_api](rmp_api/) | School search, professor search/details, ratings, paginated review text, bounded bulk professor/review retrieval | 8001 |
 
+## Bot implementation plan
+
+The APIs are implemented; **CourseCrew**, the Discord bot for SameClass, is planned. Start with the [canonical milestone checklist](docs/discord-bot-milestones.md), consult the [workflow and architecture](docs/workflow-architecture.md) while implementing, and use the [mock chat scenarios](docs/mock-chat-scenarios.md) for testing. The [integration validation](docs/integration-validation.md) records API capabilities and limitations the bot must handle.
+
 ## Start both services
 
 Python **3.11+**. Run these commands from the repository root:
