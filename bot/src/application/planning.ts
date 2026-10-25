@@ -154,7 +154,7 @@ export class PlanningApplication {
     const context:ResearchContext={turns:prior.turns};
     const text = await this.answerCourse(question,claimed.value?.term,context);
     await this.memory.finish(room,actor.userId,prior.version,prior.turns,{requestId:eventId,question:question.slice(0,2000),answer:text.slice(0,4000),
-      tasks:context.result?.tasks??[],instructors:context.result?.instructors??[],sources:context.result?.sources??[],syllabusCoverage:context.result?.syllabusCoverage});
+      pendingQuestion:context.result?.pendingQuestion,tasks:context.result?.tasks??[],instructors:context.result?.instructors??[],sources:context.result?.sources??[],syllabusCoverage:context.result?.syllabusCoverage});
     await this.store.transact(room,`answer:${eventId}`,async tx => {
       await tx.enqueue({...response(text,[actor.userId]),requestId:eventId,replyTo});
     });
@@ -176,7 +176,7 @@ export class PlanningApplication {
     const current=await this.store.read(room);
     if(current?.id!==sessionId||!current.participants[actor.userId]||current.participants[actor.userId]!.profile.version!==profileVersion)throw new PlanningError('Voice planning context changed.');
     await this.memory.finish(room,actor.userId,prior.version,prior.turns,{requestId,question:question.slice(0,2000),answer:answer.slice(0,4000),
-      tasks:context.result?.tasks??[],instructors:context.result?.instructors??[],sources:context.result?.sources??[],syllabusCoverage:context.result?.syllabusCoverage});
+      pendingQuestion:context.result?.pendingQuestion,tasks:context.result?.tasks??[],instructors:context.result?.instructors??[],sources:context.result?.sources??[],syllabusCoverage:context.result?.syllabusCoverage});
     await this.store.transact(room,`answer:${requestId}`,async tx=>{
       signal.throwIfAborted();
       if(tx.state?.id!==sessionId||!tx.state.participants[actor.userId]||tx.state.participants[actor.userId]!.profile.version!==profileVersion)throw new PlanningError('Voice planning context changed.');

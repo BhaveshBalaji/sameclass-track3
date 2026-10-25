@@ -15,6 +15,7 @@ def test_native_filters_and_aliases_asu_http(asu_http):
         'keyword': 'AI', 'session': 'C', 'units': '3', 'college': 'ES', 'honors': 'T', 'max_pages': 2})
     assert result.status_code == 200
     query = client.search_all_classes.call_args.kwargs
+    assert query['keywords'] == 'AI' and 'keyword' not in query
     assert query['catalog_nbr'] == '575' and query['instructorName'] == 'Ada'
     assert query['daysOfWeek'] == 'MON' and query['startDate'] == '01/01/2027'
     assert query['campus_or_online_selection'] == 'O'

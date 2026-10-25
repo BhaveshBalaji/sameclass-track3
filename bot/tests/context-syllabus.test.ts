@@ -38,3 +38,20 @@ test('syllabus excerpts cover relevant later passages and never imply that the P
   assert.equal(view.textCoverage.documentUnchanged,true);
   assert.match(view.coverageExplanation,/original syllabus\/PDF is unchanged/);
 });
+
+test('topic discovery fills a semester clarification without requiring an invented course code',()=>{
+  const context:ResearchContext={turns:[{requestId:'topic',question:'Find database-related courses next semester.',answer:'Which semester?',tasks:[],instructors:[]}]};
+  const plan:ResearchPlan={tasks:[{kind:'discovery',keyword:'database',subject:'',catalog:'',semester:'',professor:null,classNumber:null}],clarification:null,directAnswer:null,refresh:false};
+  const validator=Object.create(ResearchAgent.prototype) as {validatePlan:(p:ResearchPlan,q:string,t:string|undefined,c:ResearchContext)=>void};
+  validator.validatePlan(plan,'Ray, Spring 2027.',undefined,context);
+  assert.equal(plan.clarification,null);assert.equal(plan.tasks[0]!.semester,'Spring 2027');assert.equal(plan.tasks[0]!.catalog,'');
+  const omitted=structuredClone(plan);delete omitted.tasks[0]!.keyword;
+  validator.validatePlan(omitted,'Ray, Spring 2027.',undefined,context);assert.equal(omitted.tasks[0]!.keyword,'database');
+  const absent=structuredClone(plan);absent.tasks[0]!.semester='';
+  validator.validatePlan(absent,'Find database-related courses next semester.',undefined,{turns:[]});
+  assert.equal(absent.tasks.length,0);assert.match(absent.clarification!,/semester/);
+});
+
+test('a newer semester clarification takes precedence over older structured scope',()=>{
+  assert.equal(knownScope('Ray, yes.',{turns:[root,{requestId:'new-term',question:'Use Fall 2027.',answer:'Okay',tasks:[],instructors:[]}]}).semester,'Fall 2027');
+});

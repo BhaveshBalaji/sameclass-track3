@@ -53,6 +53,22 @@ export class ResearchSources {
     return this.evidence(key,'catalog',task,{...data,results:data.results.slice(0,this.candidates)},data.retrieved_at,
       [catalogUrl({term,subject:task.subject,catalog:task.catalog})],{reused:result.reused,ageMs:result.ageMs},limitations,limitations.length?'partial':'ok');
   }
+  async discover(task:ResearchTask,budget:ResearchBudget,signal:AbortSignal):Promise<Evidence>{
+    if(!task.keyword)throw new ResearchLimit('A search topic is required.');
+    const term=semesterCode(task.semester),key=`discovery:${JSON.stringify([term,task.subject,task.keyword.toLowerCase(),task.delivery??'A'])}`;
+    const result=await this.read(key,'asu',this.seatsTtl,budget,signal,()=>this.asu.get('/api/search',catalogSchema,
+      {term,keywords:task.keyword!,...(task.subject?{subject:task.subject}:{}),search_type:'all',max_pages:'2',campus_or_online_selection:task.delivery??'A'},signal));
+    const data=result.value;
+    if(data.count!==data.results.length||data.results.some(s=>s.term!==term||(task.subject&&s.subject!==task.subject)))throw new APIError('invalid_response');
+    // Bound by distinct courses rather than many sections of the same course.
+    const courses=[...new Map(data.results.map(row=>[`${row.subject} ${row.catalog_nbr}`,row])).values()];
+    const limited=courses.length>this.candidates,limitations:string[]=[];
+    if(!data.complete)limitations.push('Keyword search coverage is partial; additional courses may exist.');
+    if(limited)limitations.push(`Showing ${this.candidates} distinct courses from the fetched results.`);
+    const url=new URL(catalogUrl({term,subject:task.subject,catalog:''}));url.searchParams.set('keywords',task.keyword);
+    return this.evidence(key,'discovery',task,{...data,keyword:task.keyword,sectionCount:data.count,distinctCourses:courses.length,representativeSections:true,results:courses.slice(0,this.candidates)},data.retrieved_at,
+      [url.toString()],{reused:result.reused,ageMs:result.ageMs},limitations,limitations.length?'partial':'ok');
+  }
   async courseDetails(task:ResearchTask,budget:ResearchBudget,signal:AbortSignal):Promise<Evidence>{
     const term=semesterCode(task.semester),key=`details:${term}:${task.subject}:${task.catalog}`;
     const result=await this.read(key,'asu',this.evidenceTtl,budget,signal,()=>this.asu.get('/api/course_description',details,{term,subject:task.subject,catalog_nbr:task.catalog},signal));
