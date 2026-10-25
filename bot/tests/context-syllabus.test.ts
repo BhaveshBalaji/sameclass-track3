@@ -55,3 +55,14 @@ test('topic discovery fills a semester clarification without requiring an invent
 test('a newer semester clarification takes precedence over older structured scope',()=>{
   assert.equal(knownScope('Ray, yes.',{turns:[root,{requestId:'new-term',question:'Use Fall 2027.',answer:'Okay',tasks:[],instructors:[]}]}).semester,'Fall 2027');
 });
+
+test('official department names resolve to their own subjects rather than broad keyword matches',async()=>{
+  const {subjectHints,expandSubjectNames,ASU_SUBJECTS}=await import('../src/research/subjects.js');
+  assert.ok(Object.keys(ASU_SUBJECTS).length>300);
+  for(const [name,code] of [['Chemistry','CHM'],['Biochemistry','BCH'],['Computer science','CSE'],['Physics','PHY']])assert.deepEqual(subjectHints(name!).map(h=>h.code),[code]);
+  assert.equal(expandSubjectNames('Chemistry 113 in Spring 2027'),'CHM 113 in Spring 2027');
+  const plan:ResearchPlan={tasks:[{kind:'discovery',keyword:'chemistry',subject:'BCH',catalog:'',semester:'Spring 2027',professor:null,classNumber:null}],clarification:null,directAnswer:null,refresh:false};
+  const validator=Object.create(ResearchAgent.prototype) as {validatePlan:(p:ResearchPlan,q:string,t:string|undefined,c:ResearchContext)=>void};
+  validator.validatePlan(plan,'Find chemistry courses in Spring 2027.',undefined,{turns:[]});
+  assert.equal(plan.tasks[0]!.subject,'CHM');assert.equal(plan.clarification,null);
+});

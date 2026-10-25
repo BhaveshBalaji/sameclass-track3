@@ -107,3 +107,19 @@ test('keyword discovery sends the ASU keywords filter and preserves distinct cou
   const e=await source.discover({kind:'discovery',keyword:'database',subject:'',catalog:'',semester:'Spring 2027',professor:null,classNumber:null},{signal,tools:0,models:0,maxTools:2,maxModels:3,refresh:false},signal);
   assert.deepEqual((e.data as {results:{subject:string}[]}).results.map(r=>r.subject),['CSE','IFT']);
 });
+
+test('department discovery fetches deeper coverage, keeps all course summaries and aggregates instructors',async()=>{
+  const fixture=JSON.parse(await readFile(join(repoRoot,'class_search_api/example_response.json'),'utf8'));
+  const row=fixture.results[0];fixture.results=Array.from({length:16},(_,i)=>({...row,subject:'CHM',catalog_nbr:String(100+i),title:'Synthetic chemistry '+i,instructors:[{name:'Teacher A'}]}));
+  fixture.results.push({...fixture.results[0],class_nbr:'99999',instructors:[{name:'Teacher B'}]});fixture.count=17;fixture.complete=true;
+  const scheduler=new ResearchScheduler();
+  const source=new ResearchSources(new APIClient('https://asu.test',1000,async input=>{
+    const url=new URL(String(input));assert.equal(url.searchParams.get('subject'),'CHM');assert.equal(url.searchParams.has('keywords'),false);assert.equal(url.searchParams.get('max_pages'),'10');
+    return Response.json(fixture);
+  }),new APIClient('https://rmp.test',1000,async()=>assert.fail('not requested')),scheduler);
+  const signal=new AbortController().signal;
+  const e=await source.discover({kind:'discovery',keyword:'chemistry',subject:'',catalog:'',semester:'Spring 2027',professor:null,classNumber:null},{signal,tools:0,models:0,maxTools:2,maxModels:3,refresh:false},signal);
+  const data=e.data as {results:{instructors:{name:string}[]}[];distinctCourses:number};
+  assert.equal(e.status,'ok');assert.equal(data.results.length,16);assert.equal(data.distinctCourses,16);
+  assert.deepEqual(data.results[0]!.instructors.map(i=>i.name),['Teacher A','Teacher B']);
+});

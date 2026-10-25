@@ -1,3 +1,4 @@
+import {namedSubject} from './subjects.js';
 import {SYLLABUS_EXTRACTION_LIMIT} from './syllabus-view.js';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -54,19 +55,26 @@ export class ResearchSources {
       [catalogUrl({term,subject:task.subject,catalog:task.catalog})],{reused:result.reused,ageMs:result.ageMs},limitations,limitations.length?'partial':'ok');
   }
   async discover(task:ResearchTask,budget:ResearchBudget,signal:AbortSignal):Promise<Evidence>{
-    if(!task.keyword)throw new ResearchLimit('A search topic is required.');
-    const term=semesterCode(task.semester),key=`discovery:${JSON.stringify([term,task.subject,task.keyword.toLowerCase(),task.delivery??'A'])}`;
+    if(!task.keyword&&!task.subject)throw new ResearchLimit('A search topic or subject is required.');
+    const subject=task.subject||namedSubject(task.keyword??'')||'';
+    // Department names should browse all CHM/BCH/etc. courses, including titles
+    // which abbreviate the department (e.g. "Gen Chem" rather than "Chemistry").
+    const keyword=namedSubject(task.keyword??'')===subject?'':task.keyword??'';
+    const term=semesterCode(task.semester),key=`discovery:${JSON.stringify([term,subject,keyword.toLowerCase(),task.delivery??'A'])}`;
     const result=await this.read(key,'asu',this.seatsTtl,budget,signal,()=>this.asu.get('/api/search',catalogSchema,
-      {term,keywords:task.keyword!,...(task.subject?{subject:task.subject}:{}),search_type:'all',max_pages:'2',campus_or_online_selection:task.delivery??'A'},signal));
+      {term,...(keyword?{keywords:keyword}:{}),...(subject?{subject}:{}),search_type:'all',max_pages:'10',campus_or_online_selection:task.delivery??'A'},signal));
     const data=result.value;
-    if(data.count!==data.results.length||data.results.some(s=>s.term!==term||(task.subject&&s.subject!==task.subject)))throw new APIError('invalid_response');
-    // Bound by distinct courses rather than many sections of the same course.
-    const courses=[...new Map(data.results.map(row=>[`${row.subject} ${row.catalog_nbr}`,row])).values()];
-    const limited=courses.length>this.candidates,limitations:string[]=[];
-    if(!data.complete)limitations.push('Keyword search coverage is partial; additional courses may exist.');
-    if(limited)limitations.push(`Showing ${this.candidates} distinct courses from the fetched results.`);
-    const url=new URL(catalogUrl({term,subject:task.subject,catalog:''}));url.searchParams.set('keywords',task.keyword);
-    return this.evidence(key,'discovery',task,{...data,keyword:task.keyword,sectionCount:data.count,distinctCourses:courses.length,representativeSections:true,results:courses.slice(0,this.candidates)},data.retrieved_at,
+    if(data.count!==data.results.length||data.results.some(s=>s.term!==term||(subject&&s.subject!==subject)))throw new APIError('invalid_response');
+    const groups=new Map<string,CatalogResult['results']>();
+    for(const row of data.results){const code=`${row.subject} ${row.catalog_nbr}`;groups.set(code,[...groups.get(code)??[],row]);}
+    const courses=[...groups.values()].map(rows=>({subject:rows[0]!.subject,catalog_nbr:rows[0]!.catalog_nbr,term,
+      title:rows[0]!.title,sectionCount:rows.length,instructors:[...new Set(rows.flatMap(r=>r.instructors.map(i=>i.name)))].map(name=>({name}))}));
+    const limited=courses.length>150,limitations:string[]=[];
+    if(!data.complete)limitations.push('More matching courses may exist.');
+    if(limited)limitations.push(`Showing 150 of ${courses.length} matching courses.`);
+    const url=new URL(catalogUrl({term,subject,catalog:''}));if(keyword)url.searchParams.set('keywords',keyword);
+    return this.evidence(key,'discovery',{...task,subject},{keyword,subject,sectionCount:data.count,distinctCourses:courses.length,
+      complete:data.complete,pages_fetched:data.pages_fetched,results:courses.slice(0,150)},data.retrieved_at,
       [url.toString()],{reused:result.reused,ageMs:result.ageMs},limitations,limitations.length?'partial':'ok');
   }
   async courseDetails(task:ResearchTask,budget:ResearchBudget,signal:AbortSignal):Promise<Evidence>{

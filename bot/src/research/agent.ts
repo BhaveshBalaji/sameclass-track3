@@ -1,3 +1,4 @@
+import {subjectHints,expandSubjectNames} from './subjects.js';
 import {knownScope} from './context-scope.js';
 import {syllabusView} from './syllabus-view.js';
 import { randomUUID } from 'node:crypto';
@@ -48,6 +49,7 @@ export class ResearchAgent implements CourseResearch {
         const result=await generateText({model,temperature:0,maxRetries:0,maxOutputTokens:1800,abortSignal:signal,
           output:Output.object({schema:planSchema}),system:safety
           +'You are a task router, not an answering assistant. You have no catalog knowledge until tools run. Never reject a future semester or claim an offering/instructor is unavailable. Plan the requested lookups so the workers can verify them. An explicit semester in the question needs no active session. Plan only the work needed to answer the question. Tasks: catalog=instructors/sections/seats/meetings; details=course description/prerequisite text; '
+          +'Use the supplied ASU subjectHints: Chemistry means CHM, Biochemistry BCH, Computer Science CSE. A department request should browse that subject, not broad title matches. '
           +'discovery=keyword search for a topic across the ASU catalog without needing a course code; include the keyword field explicitly using the topic noun phrase verbatim from the user (e.g. database), empty catalog, optional subject (empty for all departments), and a semester. Use discovery for topic requests rather than inventing course numbers. Never claim keyword browsing is unavailable. '
           +'syllabus=assignments/exams/grading from syllabus; reviews=RMP student opinions/ratings about a listed instructor. '
           +'For a question asking only WHO teaches a course, request catalog. When reviews, ratings, difficulty or a recommendation are requested, request reviews as well. Do not downgrade a review request to a catalog-only answer. For syllabus plus reviews request those independent tasks, not unrelated research. '
@@ -61,7 +63,7 @@ export class ResearchAgent implements CourseResearch {
           +'An instructor name may be null: workers discover ALL listed instructors for that course and research them in parallel. Never ask the user to name an instructor when the catalog can supply them. Ask at most one short question for information that genuinely cannot be inferred. Class number may be null. '
           +'Use uppercase course subjects and numbers; semester as Spring/Summer/Fall YYYY. Set refresh true if the user asks for fresh/current/latest data. '
           +'Do not implement group schedule recommendations; explain that compatibility checking is not available yet.',
-          prompt:JSON.stringify({question:question.slice(0,4000),pendingRequest:context.turns.at(-1)?.pendingQuestion,conversation:context.turns.map(t=>({question:t.question,answer:t.answer.replace(/https?:\/\/[^\s)]+/g,'[source]').slice(0,2000),tasks:t.tasks,instructors:t.instructors,syllabusCoverage:t.syllabusCoverage})),offeringScope:context.offeringScope,knownScope:knownScope(question,context,activeTerm),activeSemester:activeTerm?semesterName(activeTerm):null})});
+          prompt:JSON.stringify({question:question.slice(0,4000),pendingRequest:context.turns.at(-1)?.pendingQuestion,conversation:context.turns.map(t=>({question:t.question,answer:t.answer.replace(/https?:\/\/[^\s)]+/g,'[source]').slice(0,2000),tasks:t.tasks,instructors:t.instructors,syllabusCoverage:t.syllabusCoverage})),offeringScope:context.offeringScope,subjectHints:subjectHints(question),knownScope:knownScope(question,context,activeTerm),activeSemester:activeTerm?semesterName(activeTerm):null})});
         usage(result.usage);plan=planSchema.parse(result.output);
         if(plan.tasks.length>this.config.RESEARCH_MAX_TASKS)plan.tasks=plan.tasks.slice(0,this.config.RESEARCH_MAX_TASKS);
         // A comparison with an already-known shortlist needs evidence, not another intake question.
@@ -150,8 +152,8 @@ export class ResearchAgent implements CourseResearch {
         const evidence=[...new Map(workers.flatMap(w=>w.evidence).map(e=>[e.id,e])).values()];
         if(!evidence.length){answer='I couldn’t retrieve enough reliable evidence to answer. Please try again shortly.';return {status:'unavailable'};}
         try{
-          const result=await generateText({model,maxRetries:0,maxOutputTokens:1000,abortSignal:signal,
-            system:safety+'Answer directly in roughly 60–120 words, or fewer for simple questions. Use ONLY the evidence below for factual claims. Format the answer with a short **Course** or **Recommendation** heading and concise bullets with **bold professor names**. For multiple requested topics, use two or three short bold headings. Avoid dense paragraphs. Do not dump sections or tool payloads. No throat-clearing, repeated catalog/date disclaimers, verification boilerplate, generic warnings or statements that there is no universally best professor. Give the qualified recommendation directly. Include important missing-data or historical-source qualifications once, briefly. Do not tell users to wait for new reviews when the actual problem is an unverified profile. Ask a basic question only if it can resolve a genuinely missing detail. '
+          const result=await generateText({model,maxRetries:0,maxOutputTokens:2200,abortSignal:signal,
+            system:safety+'Answer directly in roughly 60–120 words for simple questions; use more space when the user requests a complete list or a multi-part comparison. Use ONLY the evidence below for factual claims. Use a short heading and concise bullets. For course discovery, name useful courses with code and title; omit section counts unless asked. A short selection from a complete search is a shortlist, never call that selection the full listing. If the user requests all courses, list all retrieved course codes/titles instead of a shortlist; for recommendations, add a grounded reason for each choice. Do not substitute a coverage disclaimer for the requested options. Avoid internal phrases such as fetched results, page limit, worker, or source budget. Mention incomplete coverage once in plain language only if it is actually incomplete. For multiple requested topics, use two or three short bold headings. Avoid dense paragraphs. Do not dump sections or tool payloads. No throat-clearing, repeated catalog/date disclaimers, verification boilerplate, generic warnings or statements that there is no universally best professor. Give the qualified recommendation directly. Include important missing-data or historical-source qualifications once, briefly. Do not tell users to wait for new reviews when the actual problem is an unverified profile. Ask a basic question only if it can resolve a genuinely missing detail. '
               +'For professor-only questions give unique names. Include other details only when requested. Do not mention seat counts or add a seat disclaimer to professor-only questions. Do not print retrieval dates for stable facts like instructor names. Only include a short checked time for requested seat availability. Write the complete answer as concise plain text or Markdown, not JSON. Do not output URLs or internal evidence IDs; verified source links are appended by code. '
               +'Clearly distinguish official syllabus facts from student opinions. Label a historical syllabus once with its semester and instructor; never attribute historical exam weights to the current offering. '
               +'Use the supplied sourceSemester name; never convert ASU numeric term codes yourself. If historical evidence contains the requested exam/grading information, summarize it with that historical label rather than ignoring it. '
@@ -164,7 +166,7 @@ export class ResearchAgent implements CourseResearch {
               workers:workers.map(w=>({...w,evidence:w.evidence.map(e=>({id:e.id}))})),evidence:evidence.map(e=>({...e,sources:undefined,data:e.kind==='syllabus'?syllabusView(e.data,question):e.data}))})});
           usage(result.usage);
           if(!result.text.trim())throw new ResearchLimit('No supported summary was generated.');
-          const prose=result.text.slice(0,4500).replace(/\[([^\]]+)\]\([^)]*\)/g,'$1').replace(/https?:\/\/\S+/g,'').replace(/\[E[a-f0-9]{12}\]/g,'').replace(/@/g,'@\u200b');
+          const prose=result.text.replace(/\[([^\]]+)\]\([^)]*\)/g,'$1').replace(/https?:\/\/\S+/g,'').replace(/\[E[a-f0-9]{12}\]/g,'').replace(/@/g,'@\u200b');
           const partialReviews=evidence.some(e=>e.kind==='review_corpus'&&e.status==='partial');
           answer=prose+(partialReviews&&!/\b(?:partial|incomplete|limited|not all)\b/i.test(prose)?'\nReview coverage is partial.':'')+'\n\n'+researchLinks(evidence);
         }catch{answer=this.partialAnswer(workers);}
@@ -209,7 +211,7 @@ export class ResearchAgent implements CourseResearch {
   private validatePlan(plan:ResearchPlan,question:string,activeTerm:string|undefined,context:ResearchContext){
     const scope=knownScope(question,context,activeTerm);
     const history=context.turns.map(t=>`${t.question} ${t.answer} ${t.tasks.map(k=>`${k.subject} ${k.catalog} ${k.semester} ${k.professor??''}`).join(' ')} ${t.instructors.join(' ')}`).join('\n');
-    const available=`${question}\n${history}\n${context.offeringScope?.instructors.join(' ')??''}`,compact=available.replace(/[^a-z0-9]/gi,'').toUpperCase();
+    const available=`${expandSubjectNames(question)}\n${expandSubjectNames(history)}\n${question}\n${history}\n${context.offeringScope?.instructors.join(' ')??''}`,compact=available.replace(/[^a-z0-9]/gi,'').toUpperCase();
     const explicitTerms=[...question.matchAll(/\b(?:(?:spring|summer|fall|autumn)\s+20\d{2}|20\d{2}\s+(?:spring|summer|fall|autumn))\b/gi)].map(m=>semesterCode(m[0]));
     const contextualTerms=[...history.matchAll(/\b(?:(?:spring|summer|fall|autumn)\s+20\d{2}|20\d{2}\s+(?:spring|summer|fall|autumn))\b/gi)].map(m=>semesterCode(m[0]));
     const structuredTerms=context.turns.flatMap(t=>t.tasks).filter(t=>t.semester).map(t=>semesterCode(t.semester));
@@ -232,7 +234,9 @@ export class ResearchAgent implements CourseResearch {
         const requested=[question,...context.turns.map(t=>t.question)].join(' ').toLowerCase();
         const modifier=[...requested.matchAll(/\b([a-z][a-z-]*)(?:\s+related)?\s+(?:courses|classes)\b/gi)].at(-1)?.[1]?.replace(/-related$/i,'');
         const fallback=modifier&&!/^(?:any|some|the|all|these|those|other|available|offered|my|our|related)$/i.test(modifier)?modifier:undefined;
-        const keyword=task.keyword?.trim()??fallback;
+        const named=subjectHints(question);
+        const department=named.length===1?named[0]:undefined;
+        const keyword=task.keyword?.trim()??fallback??(department?(requested.includes(department.name.toLowerCase())?department.name.toLowerCase():department.code.toLowerCase()):undefined);
         task.keyword=keyword;
         if(!keyword||!keyword.toLowerCase().split(/\W+/).filter(Boolean).every(word=>requested.includes(word))){
           plan.tasks=[];plan.directAnswer=null;plan.clarification='What topic would you like to browse?';break;
@@ -240,7 +244,9 @@ export class ResearchAgent implements CourseResearch {
         if(!task.semester||!allowed.includes(semesterCode(task.semester))){
           plan.tasks=[];plan.directAnswer=null;plan.clarification='Which semester and year should I search for those courses?';break;
         }
-        if(task.subject&&!new RegExp(`\\b${task.subject}\\b`,'i').test(available))task.subject='';
+        const hints=named.length?named:subjectHints(keyword);
+        if(hints.length===1)task.subject=hints[0]!.code;
+        else if(task.subject&&!new RegExp(`\\b${task.subject}\\b`,'i').test(available))task.subject='';
         task.catalog='';task.professor=null;task.classNumber=null;continue;
       }
       const inherit=task.kind!=='reviews'||task.subject||task.catalog||!task.professor||/\b[a-z]{2,5}\s*\d{3}/i.test(question)||context.turns.some(t=>t.instructors.includes(task.professor!));
