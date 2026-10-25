@@ -71,3 +71,12 @@ test('interrupted or superseded voice plan is not queued for text delivery',asyn
   const sent:string[]=[];await store.deliver(room,async(body)=>{sent.push(body.text);return crypto.randomUUID();});
   assert.ok(!sent.includes('stale synthetic plan'));
 });
+test('recap refreshes notes and explicitly preserves unknowns without claiming acceptance',async()=>{
+  const {app,store,id}=await setup();
+  await app.voiceIntake(room,id,alice,'a1','I work Tuesdays.');
+  const result=await app.voiceRecap(room,id,alice,new AbortController().signal) as {members:{name:string;facts:unknown[]}[];latestPlan:unknown};
+  assert.equal(result.latestPlan,null);assert.equal(result.members.find(p=>p.name==='Bob')!.facts.length,0);
+  const sent:string[]=[];await store.deliver(room,async body=>{sent.push(body.text);return crypto.randomUUID();});
+  const recap=sent.find(s=>s.includes('Voice session recap'))!;
+  assert.match(recap,/Bob: preferences unknown/);assert.match(recap,/no group acceptance is implied/);
+});

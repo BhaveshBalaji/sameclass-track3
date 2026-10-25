@@ -113,3 +113,11 @@ test('roster consent, follow-up ownership, pause and stale callbacks are enforce
   authorized=false;await session.transcript('alice','Hey Ray, hello');assert.equal(session.participants.has('alice'),false);
   assert.ok(stops>0);session.close();
 });
+test('addressed-turn budget pauses before making another provider connection',async()=>{
+  let connections=0;
+  const session=new VoiceSession({...config,VOICE_MAX_TURNS:1},{authorized:async()=>true,intake:async()=>{},tool:async()=>({})},
+    {audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},()=>{connections++;return {start:async()=>{},message:()=>{},close:()=>{}};});
+  session.join(actor);await session.transcript(actor.userId,'Hey Ray, hello.');
+  await session.transcript(actor.userId,'Hey Ray, another question.');
+  assert.equal(connections,1);assert.equal(session.listening,false);session.close();
+});

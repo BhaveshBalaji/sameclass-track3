@@ -24,9 +24,10 @@ export class VoiceSession {
   private generation = 0;
   private closed = false;
   private paused = false;
+  private turns = 0;
   private followup?: { userId: string; until: number };
   private history: { userId: string; text: string }[] = [];
-  constructor(private config: Pick<Config, 'ELEVENLABS_API_KEY' | 'ELEVENLABS_AGENT_ID' | 'VOICE_FOLLOWUP_SECONDS' | 'VOICE_MAX_PARTICIPANTS'>,
+  constructor(private config: Pick<Config, 'ELEVENLABS_API_KEY' | 'ELEVENLABS_AGENT_ID' | 'VOICE_FOLLOWUP_SECONDS' | 'VOICE_MAX_PARTICIPANTS' | 'VOICE_MAX_TURNS'>,
     private backend: VoiceBackend, private output: VoiceOutput,
     private factory: AgentFactory = callbacks => new ElevenAgent(config, callbacks), private now = Date.now) {}
 
@@ -62,6 +63,8 @@ export class VoiceSession {
       if (this.followup?.userId !== userId) this.followup = undefined;
       return;
     }
+    if(this.turns>=this.config.VOICE_MAX_TURNS){this.pause();this.output.status('Voice question budget reached. End/rejoin for a new session or use text.');return;}
+    this.turns++;
     this.interrupt();
     const generation = this.generation;
     const current = () => !this.closed && !this.paused && generation === this.generation && this.participants.has(userId);

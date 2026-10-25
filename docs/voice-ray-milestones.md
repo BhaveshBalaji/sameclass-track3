@@ -1,6 +1,6 @@
 # Voice Ray: ElevenLabs demo milestones
 
-Planned October 25, 2026 (America/Phoenix), against Track-3 branch `demo`. This is a planning document; no voice capability has been implemented or verified yet. The user approved a modest voice scope and explicitly allowed difficult extras to be dropped. Use this checklist for the voice extension and the [main checklist](discord-bot-milestones.md) for existing text/research/planning work. Implement one milestone at a time and record actual verification before moving on.
+Planned October 25, 2026 (America/Phoenix), against Track-3 branch `demo`; implemented on `codex/ray-voice` with live acceptance still pending. The progress notes distinguish code/tests from actual Discord voice proof. The user approved a modest scope, allowed difficult extras to be dropped, and subsequently authorized continuous implementation without waiting for milestone approvals. Use this checklist for the voice extension and the [main checklist](discord-bot-milestones.md) for existing text/research/planning work.
 
 ## Product scope
 
@@ -148,8 +148,18 @@ The real planner now exposes spoken names, selected courses/sections, instructor
 
 Four isolated-Postgres voice regressions passed for separate notes/corrections, research-question isolation, reset during extraction, both-member refresh and cancellation before publication. The group suite passed (23 tests before adding one focused spoken/text allocation consistency check); the updated eight-test recommendation file and six voice protocol/controller tests passed. Live group readout remains pending; no voice milestone is marked complete.
 
-- [ ] V0: voice transport and conversational tool proof.
-- [ ] V1: live conversational course questions.
-- [ ] V2: separate student notes and corrections.
-- [ ] V3: named group recommendations.
-- [ ] V4: controls, recap and repeatable demo.
+### V4 implementation and current live gate
+
+Added requested session recap, bounded question/output budgets, domain transcription keyterms, clear listening/paused/researching/speaking/disconnected status, developer setup instructions and a focused opt-in paid agent proof command. The agent closes after each completed response so idle provider turn timeouts cannot produce unsolicited speech. Agent settings read-back confirms four attached client tools, authenticated access, one concurrent call, a 100-call daily cap, no bursting/queue, no voice recording and one-day agent transcript retention. Automatic suggestions remain deferred.
+
+Local checks loaded the actual Opus codec, DAVE native dependency and AES-256-GCM successfully. Seven voice protocol/controller/audio tests, five isolated-Postgres voice tests, the 31 existing offline regressions, ten planning storage regressions and the affected group/recommendation tests passed across focused runs; TypeScript build passed. The recap check preserves a silent member's unknown preferences and explicitly avoids claiming consensus. These are software checks, not live speaker/audio verification.
+
+A read-only Discord API lookup found one regular voice channel, **General**. Its ID and the dedicated agent ID were added to the existing ignored `.env`, preserving other settings and keeping `VOICE_ENABLED=false`. The final `npm run check:voice` reports only `ELEVENLABS_API_KEY` missing. The connected plugin manages agents but cannot supply the local runtime credential. Add a same-workspace runtime key privately to `.env`, run the opt-in provider proof, enable voice/register commands, then perform the two-person Discord proof and two rehearsals. No credentials or student voice data were committed. The goal remains incomplete pending this real integration/acceptance work; no live milestone checkbox is checked.
+
+The pre-existing local supervisor/Gateway worker was still running and was left intact. No second live worker or voice probe was started against it, and live commands were not re-registered during this unconfigured build. The one-time scheduled kickoff was deleted after dispatch; continued work belongs to the persistent goal rather than duplicate scheduled builds.
+
+- [ ] V0: transport/controller/dependency code tested; runtime-key/channel setup and real two-person voice proof pending.
+- [ ] V1: course tool and follow-up code tested; live spoken questions pending.
+- [ ] V2: separate notes/corrections/reset tested with isolated Postgres; live speaker recognition and read-back pending.
+- [ ] V3: named allocation presentation and stale-result guards tested; live group readout pending.
+- [ ] V4: controls/recap/setup checks implemented; two complete live rehearsals pending. Optional proactivity deferred.

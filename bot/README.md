@@ -1,5 +1,47 @@
 # Ray · local Discord planning bot
 
+## Voice Ray (implemented; live acceptance pending)
+
+Voice is off by default. The approved [V0–V4 checklist](../docs/voice-ray-milestones.md) records actual verification and pending checks. The scheduled build added the Discord/ElevenLabs connection, course tools, separate student notes, named planner output, interruption controls and recap. This is not yet a verified live Discord voice demo: the project runtime key is missing and no two-human rehearsal has run. The ignored local `.env` has the dedicated agent and the server's only regular voice channel, **General**, preconfigured; review that channel before enabling voice.
+
+The ElevenLabs plugin created a dedicated development agent. Its nonsecret ID and tool/voice configuration are in `bot/voice-agent.json`; it requires authentication, has voice recording disabled and agent transcript retention set to one day. Separate Scribe transcription has its own provider retention policy; zero retention is not claimed. A plugin login does not automatically give the local worker an API key.
+
+Add the following values to the existing ignored root `.env` without replacing its other credentials:
+
+```dotenv
+VOICE_ENABLED=false
+ELEVENLABS_API_KEY=your_runtime_key
+ELEVENLABS_AGENT_ID=agent_7501m5scd31dfd6sgqtr92yj8e2d
+DISCORD_VOICE_CHANNEL_ID=your_server_voice_channel_id
+VOICE_MAX_PARTICIPANTS=4
+VOICE_MAX_DURATION_SECONDS=1200
+VOICE_FOLLOWUP_SECONDS=30
+VOICE_MAX_TURNS=30
+```
+
+Use a runtime key from the same ElevenLabs workspace with agent conversation and realtime speech-to-text access. Never put it in source code, Discord messages or screenshots. The single configured regular voice channel must belong to the configured guild; Ray needs View Channel, Connect and Speak. The worker requests `GuildVoiceStates` only with voice enabled and joins without self-deafening. Its computer/network must permit Discord voice UDP traffic; hosted deployment is deferred.
+
+```bash
+npm run check:voice             # local setup, Opus and DAVE dependency checks; no inference
+npm run check:voice -- --live   # OPT-IN PAID synthetic agent/audio/tool proof; no Discord posts
+npm run test:voice             # offline protocol/controller/audio regressions
+npm run test:voice:planning    # isolated Postgres preference/planning regressions
+```
+
+After configuration and the provider proof, set `VOICE_ENABLED=true`, register commands with `npm run register:commands`, then start the worker normally. Avoid a second worker connected to the same live Discord/database namespace.
+
+1. Start a normal `/plan start` session in the allowed text channel and have each student click **Join planning**.
+2. Join the configured voice channel. Each student runs `/voice join consent:true` in that same text channel to opt in to audio/transcript processing. `consent:false` shows the notice. Being in the voice channel alone does not opt someone in.
+3. Speak naturally; finalized utterances become bounded, author-attributed pending notes. Say “Hey Ray, what is CSE 445 about?” for a course answer; source-linked detail appears in text. The same speaker can ask a follow-up without “Ray” within 30 seconds; another speaker addresses Ray to take over.
+4. Ask “Ray, what have you noted for me?” to refresh/read only your profile. Correct your own preferences, then request another read-back. Research questions do not become planning facts. A group recommendation refreshes all joined members' pending notes, including their text contributions.
+5. Ask “Ray, recommend classes for our group.” Ray calls the existing planner; the spoken names/courses and posted assignments come from the same allocated options. The result remains a proposal and retains missing-data/eligibility qualifications.
+6. Ask for a session recap to summarize saved needs/proposed section IDs and unresolved unknowns in text and voice. Ask “why that option?” while the bounded conversation context remains active for a brief explanation. Ray does not infer votes or acceptance.
+7. `/voice pause` and `/voice resume` are for the planning-session owner/moderator. `/voice leave` removes your capture; the last participant leaving disconnects Ray. `/voice end` ends the room for the owner/moderator. Channel departure and planning leave also revoke audio intake. Profile reset clears retained sources and ephemeral voice conversation context.
+
+The session stops after 20 minutes and has a 30-addressed-turn cap. End/rejoin manually after a connection failure or exhausted session; saved profiles persist but audio is never replayed. Speech bursts are limited to 30 seconds. Start with turn-taking and headphones: overlapping humans, background noise and acoustic echo are outside the demo's verified behavior. Voice activity stops buffered Ray audio; stale provider/tool results are suppressed. The controller reconnects the hosted agent for each addressed turn, restoring up to six bounded conversation entries; it does not promise seamless provider session recovery.
+
+Automatic proactive suggestions are deferred. Complete the two-person audio/source/interruption checks and the checklist's two rehearsals before marking voice milestones complete. No live source answers are replaced by demo fixtures.
+
 Milestones 0–3 implement local startup, portable configuration, Postgres persistence, Discord preference intake and LLM-driven course research. LangGraph coordinates a planner, bounded research workers and an answer writer. DeepSeek through OpenRouter/Relace selects relevant research tasks; the AI SDK tool loop calls scoped ASU/RMP tools. Shared schedule recommendations remain Milestone 4 work.
 
 ## Setup and start

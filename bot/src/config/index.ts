@@ -67,6 +67,7 @@ const schema = z.object({
   VOICE_MAX_PARTICIPANTS: z.coerce.number().int().min(1).max(4).default(4),
   VOICE_MAX_DURATION_SECONDS: z.coerce.number().int().min(60).max(1200).default(1200),
   VOICE_FOLLOWUP_SECONDS: z.coerce.number().int().min(0).max(60).default(30),
+  VOICE_MAX_TURNS: z.coerce.number().int().min(1).max(60).default(30),
 });
 export type Config = z.infer<typeof schema>;
 export class ConfigurationError extends Error { constructor(message: string) { super(message); this.name = 'ConfigurationError'; } }

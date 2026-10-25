@@ -236,6 +236,23 @@ export class PlanningApplication {
       presentation:result.spoken??'Structured spoken recommendation details are unavailable. Refer to the detailed plan posted in text; do not invent courses from section IDs.',
       instruction:'Address each member by name, then summarize shared options. Preserve preliminary and missing-data qualifications. This is a proposal, not consensus.'};
   }
+  async voiceRecap(room:Room,sessionId:string,actor:Actor,signal:AbortSignal):Promise<unknown>{
+    const snapshot=await this.voiceRefresh(room,sessionId,actor,signal,true);
+    const members=Object.values(snapshot.participants).filter(p=>p.active).map(p=>({name:p.name,
+      facts:Object.values(p.profile.facts).filter((f):f is Fact=>Boolean(f)).map(f=>({field:f.field,strength:f.strength,values:f.values}))}));
+    const plan=snapshot.lastRecommendation;
+    const latestPlan=plan?{sectionIds:plan.sectionIds,current:plan.inputVersion===snapshot.version}:null;
+    const lines=members.map(p=>`${clean(p.name)}: ${p.facts.length?p.facts.map(f=>`${f.field.replace(/_/g,' ')} (${f.strength}): ${clean(f.values.join('; '))}`).join('; '):'preferences unknown'}`);
+    const text=`**Voice session recap · ${semesterName(snapshot.term)}**\n\n${lines.join('\n\n')}\n\n`
+      +(latestPlan?`Latest proposed section IDs: ${latestPlan.sectionIds.join(', ')||'none'}.${latestPlan.current?'':' Preferences changed since that plan; request an update.'}`:'No recommendation has been generated yet.')
+      +'\nThis records saved needs and proposals; no group acceptance is implied. Degree/prerequisite eligibility and missing requirements remain unchecked.';
+    await this.store.transact(room,`voice-recap:${randomUUID()}`,async tx=>{
+      signal.throwIfAborted();
+      if(tx.state?.id!==sessionId||tx.state.version!==snapshot.version||!tx.state.participants[actor.userId]?.active)throw new PlanningError('Session changed. Request a new recap.');
+      await tx.enqueue(response(text),true);
+    });
+    return {semester:semesterName(snapshot.term),members,latestPlan,instruction:'Briefly recap saved needs and unresolved unknowns. Do not read section IDs aloud or claim the group accepted a plan. Refer to the detailed proposed plan in text.'};
+  }
   async message(event: Incoming): Promise<void> {
     if (event.bot || event.webhook) return;
     if (event.botMention || event.replyTo) {

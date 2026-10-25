@@ -22,6 +22,11 @@ export class PlanningVoiceBackend implements VoiceBackend {
       z.object({}).strict().parse(call.parameters);
       return this.app.voiceNotes(this.room,this.sessionId,actor,signal);
     }
+    if(call.tool_name==='session_recap'){
+      z.object({}).strict().parse(call.parameters);
+      const result=await this.app.voiceRecap(this.room,this.sessionId,actor,signal);
+      signal.throwIfAborted();await this.deliver();return result;
+    }
     if(call.tool_name==='recommend_group'){
       z.object({}).strict().parse(call.parameters);
       if(!/\b(?:recommend(?:ation)?s?|(?:find|suggest|plan|choose|pick)\b.*\b(?:us|our|group|together|classes|courses))\b/i.test(utterance))throw new PlanningError('Ask Ray explicitly for a group recommendation first.');

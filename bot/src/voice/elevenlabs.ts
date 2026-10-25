@@ -80,7 +80,9 @@ export class ElevenAgent {
       if (this.calls.size >= 12) { this.fail(); return; }
       this.calls.add(call.tool_call_id);
       void this.callbacks.tool(call, this.controller.signal).then(result => {
-        if (!this.closed) this.send({ type: 'client_tool_result', tool_call_id: call.tool_call_id, result: JSON.stringify(result) });
+        const serialized=JSON.stringify(result);
+        if (!this.closed) this.send({ type: 'client_tool_result', tool_call_id: call.tool_call_id,
+          result:serialized.length<=24000?serialized:JSON.stringify({error:'Result is too large for a spoken answer. Refer to the linked text result or /plan profile for full details; do not invent a summary.'}) });
       }).catch(() => {
         this.send({ type: 'client_tool_result', tool_call_id: call.tool_call_id, result: 'The requested action could not be completed.', is_error: true });
       });
@@ -104,13 +106,16 @@ export class ScribeUtterance {
   private finished = false;
   private closed = false;
   private timer: ReturnType<typeof setTimeout>;
+  private fail:()=>void;
   constructor(key: string, final: (text: string) => void, failed: () => void,
     socketFactory: SocketFactory = createSocket) {
     const url = new URL('wss://api.elevenlabs.io/v1/speech-to-text/realtime');
     url.search = new URLSearchParams({ model_id: 'scribe_v2_realtime', audio_format: 'pcm_16000',
       sample_rate: '16000', commit_strategy: 'manual', language_code: 'en' }).toString();
+    for(const term of ['Ray','ASU','CSE'])url.searchParams.append('keyterms',term);
     this.socket = socketFactory(url.toString(), { 'xi-api-key': key });
     const fail = () => { if (this.closed) return; this.close(); failed(); };
+    this.fail=fail;
     this.timer = setTimeout(fail, 40000);
     this.socket.on('error', fail);
     this.socket.on('close', () => { if (!this.closed) fail(); });
@@ -140,7 +145,7 @@ export class ScribeUtterance {
     if (this.ready) this.send(pcm);
     else {
       this.bytes += pcm.length;
-      if (this.bytes > 160000) { this.close(); return; }
+      if (this.bytes > 160000) { this.fail(); return; }
       this.queue.push(Buffer.from(pcm));
     }
   }

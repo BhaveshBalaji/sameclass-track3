@@ -152,7 +152,7 @@ export class DiscordVoice {
     if(!live.session.participants.size)this.close();
   }
   departed(userId:string,channelId:string|null):void{
-    const live=this.live;if(!live||channelId===this.config.DISCORD_VOICE_CHANNEL_ID)return;
+    const live=this.live;if(!live||!live.session.participants.has(userId)||channelId===this.config.DISCORD_VOICE_CHANNEL_ID)return;
     live.captures.get(userId)?.();live.session.leave(userId);
     if(!live.session.participants.size)this.close();
   }
