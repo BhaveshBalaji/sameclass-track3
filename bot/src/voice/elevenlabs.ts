@@ -27,6 +27,7 @@ export class ElevenAgent {
   private responseSeen = false;
   private pendingTools = 0;
   private completed = false;
+  private audioUntil = 0;
   constructor(private config: Pick<Config, 'ELEVENLABS_API_KEY' | 'ELEVENLABS_AGENT_ID'>,
     private callbacks: AgentCallbacks, private socketFactory: SocketFactory = createSocket,
     private request: typeof fetch = fetch, private audioIdleMs = 2000, private reconnectDelayMs = 1000) {}
@@ -82,9 +83,16 @@ export class ElevenAgent {
   }
   private event(event: any): void {
     if (event.type === 'ping') this.send({ type: 'pong', event_id: event.ping_event.event_id });
-    if (event.type === 'audio') { if(!this.pendingTools)this.heardAudio = true;this.callbacks.audio(Buffer.from(event.audio_event.audio_base_64, 'base64'), this.rate);this.settleAudio(); }
+    if (event.type === 'audio') {
+      const pcm=Buffer.from(event.audio_event.audio_base_64,'base64');
+      // Provider synthesis can run far ahead of Discord playback. A network gap
+      // is not end-of-speech while seconds of generated PCM remain queued.
+      this.audioUntil=Math.max(Date.now(),this.audioUntil)+pcm.length/(this.rate*2)*1000;
+      if(!this.pendingTools)this.heardAudio=true;
+      this.callbacks.audio(pcm,this.rate);this.settleAudio();
+    }
     if (event.type === 'agent_response') { this.responseSeen = true;this.callbacks.text(String(event.agent_response_event.agent_response).slice(0,8000));this.settleAudio(); }
-    if (event.type === 'agent_response_complete' && this.requested && this.responseSeen && this.heardAudio && !this.pendingTools) this.finish('provider');
+    if (event.type === 'agent_response_complete' && this.requested && this.responseSeen && this.heardAudio && !this.pendingTools) this.settleAudio();
     if (event.type === 'client_tool_call') {
       const call = event.client_tool_call as VoiceToolCall;
       if (!call || typeof call.tool_call_id !== 'string' || typeof call.tool_name !== 'string') throw new Error('Invalid tool call.');
@@ -109,7 +117,7 @@ export class ElevenAgent {
     if(!this.requested||!this.heardAudio||!this.responseSeen||this.pendingTools||this.completed)return;
     // Some live voice sessions omit agent_response_complete. Finish only after
     // final answer text and quiet audio, never while a research tool is running.
-    this.idleTimer=setTimeout(()=>{if(!this.closed&&!this.pendingTools)this.finish('audio_idle');},this.audioIdleMs);
+    this.idleTimer=setTimeout(()=>{if(!this.closed&&!this.pendingTools)this.finish('audio_idle');},Math.max(this.audioIdleMs,this.audioUntil-Date.now()+this.audioIdleMs));
   }
   private finish(reason:'provider'|'audio_idle'):void{
     if(this.completed||this.closed)return;

@@ -1,3 +1,7 @@
+import {ResearchAgent} from '../src/research/agent.js';
+import {ResearchSources} from '../src/research/sources.js';
+import {ResearchScheduler} from '../src/research/scheduler.js';
+import {APIClient} from '../src/integrations/api.js';
 import { getCiphers } from 'node:crypto';
 import { loadConfig, ConfigurationError, safeFailure } from '../src/config/index.js';
 import { ElevenAgent, ScribeUtterance } from '../src/voice/elevenlabs.js';
@@ -13,14 +17,21 @@ async function main(){
   if(missing.length)throw new ConfigurationError(`Missing voice configuration: ${missing.join(', ')}`);
   if(!process.argv.includes('--live'))return;
   // OPT-IN PAID: one synthetic generated conversation/tool round trip; no Discord posts.
+  const research=process.argv.includes('--research');
   let bytes=0,toolCalls=0,toolReturned=false,postToolAudioBytes=0;const chunks:Buffer[]=[];
   await new Promise<void>((resolve,reject)=>{
-    const timer=setTimeout(()=>{agent.close();reject(new Error('Voice provider proof timed out.'));},30000);
+    const timer=setTimeout(()=>{agent.close();reject(new Error('Voice provider proof timed out.'));},research?60000:30000);
     const agent=new ElevenAgent(config,{
       audio:(pcm,rate)=>{if(rate!==16000)throw new Error('Probe needs PCM 16 kHz.');bytes+=pcm.length;if(toolReturned)postToolAudioBytes+=pcm.length;chunks.push(pcm);},text:()=>{},
       tool:async call=>{
-        if(call.tool_name!=='get_my_notes')throw new Error('Unexpected probe tool.');
+        if(call.tool_name!==(research?'research_course':'get_my_notes'))throw new Error('Unexpected probe tool.');
         toolCalls++;
+        if(research){
+          const scheduler=new ResearchScheduler();
+          const sources=new ResearchSources(new APIClient(config.ASU_API_BASE_URL,config.RESEARCH_WORKER_TIMEOUT_MS),new APIClient(config.RMP_API_BASE_URL,config.RESEARCH_WORKER_TIMEOUT_MS),scheduler);
+          const answer=await new ResearchAgent(config,sources,scheduler).answer('Find database-related courses in Spring 2027. Give course codes and titles.');
+          toolReturned=true;return {answer,instruction:'Speak a short summary with two or three actual course names. This is a synthetic integration check; nothing is posted to Discord.'};
+        }
         if(process.argv.includes('--slow-tool'))await new Promise(resolve=>setTimeout(resolve,3000));
         toolReturned=true;
         return {name:'Synthetic Probe',facts:[],instruction:'This is a synthetic integration check. Say briefly that no preferences are saved.'};
@@ -28,13 +39,13 @@ async function main(){
       complete:reason=>{
         clearTimeout(timer);agent.close();
         console.log(JSON.stringify({check:'voice_agent_observation',completion:reason,toolCalls,audioBytes:bytes}));
-        if(!bytes||!toolCalls||(process.argv.includes('--slow-tool')&&!postToolAudioBytes))reject(new Error('Voice proof needs generated audio after the tool result.'));
+        if(!bytes||!toolCalls||((research||process.argv.includes('--slow-tool'))&&!postToolAudioBytes))reject(new Error('Voice proof needs generated audio after the tool result.'));
         else{console.log(JSON.stringify({check:'voice_agent_protocol',synthetic:true,toolCalls,audioBytes:bytes,postToolAudioBytes,discordAudioVerified:false,scribeVerified:false}));resolve();}
       },
       failed:()=>{clearTimeout(timer);reject(new Error('Voice provider proof failed.'));},
     });
     void agent.start('Synthetic integration check. The current speaker is Synthetic Probe. No real student data.').then(()=>{
-      agent.message('Hey Ray, please use your notes tool to read back my saved preferences.');
+      agent.message(research?'Ray, please find database-related courses for Spring 2027.':'Hey Ray, please use your notes tool to read back my saved preferences.');
     }).catch(error=>{clearTimeout(timer);agent.close();reject(error);});
   });
   if(process.argv.includes('--scribe')){

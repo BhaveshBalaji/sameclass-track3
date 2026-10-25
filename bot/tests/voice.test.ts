@@ -263,3 +263,33 @@ test('partial transcription can identify a Ray interruption without admitting fr
   socket.event({message_type:'partial_transcript',text:'Hey Ray, wait'});
   assert.equal(interruptions,1);assert.equal(finals,0);scribe.close();
 });
+
+test('bare Ray requests work and consecutive tool speech does not evict the original user topic',async()=>{
+  const contexts:string[]=[],callbacks:AgentCallbacks[]=[];
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},tool:async()=>({})},
+    {audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},cb=>{callbacks.push(cb);return {start:async context=>{contexts.push(context);},message:()=>{},close:()=>{}};});
+  session.join(actor);session.join(other);
+  await session.transcript(actor.userId,'Ray, find database courses next semester.');
+  callbacks[0]!.text('Let me check.');callbacks[0]!.text('Which semester?');callbacks[0]!.complete();
+  await session.transcript(other.userId,'Ray, tell me about biology.');callbacks[1]!.complete();
+  await session.transcript(actor.userId,'Ray, Spring 2027.');
+  assert.match(contexts[2]!,/database courses/);assert.match(contexts[2]!,/Which semester/);assert.doesNotMatch(contexts[2]!,/biology|Let me check/);
+  callbacks[2]!.complete();await session.transcript(actor.userId,'Ray');assert.equal(callbacks.length,4);session.close();
+});
+
+test('audio completion waits for queued PCM playback across gaps in fast provider synthesis',async()=>{
+  const socket=new Socket();let completions=0;
+  const agent=new ElevenAgent({ELEVENLABS_API_KEY:'synthetic',ELEVENLABS_AGENT_ID:'synthetic'},
+    {audio:()=>{},text:()=>{},tool:async()=>({}),failed:()=>assert.fail('unexpected failure'),complete:()=>{completions++;agent.close();}},()=>{
+      queueMicrotask(()=>{socket.emit('open');socket.event({type:'conversation_initiation_metadata',conversation_initiation_metadata_event:{agent_output_audio_format:'pcm_16000'}});});
+      return socket as unknown as WebSocket;
+    },async()=>Response.json({signed_url:'wss://api.elevenlabs.io/v1/convai/conversation?token=synthetic'}),10,0);
+  await agent.start('synthetic');agent.message('Ray, explain.');
+  socket.event({type:'agent_response',agent_response_event:{agent_response:'First sentence. Second sentence.'}});
+  socket.event({type:'audio',audio_event:{audio_base_64:Buffer.alloc(3200).toString('base64')}}); // 100ms PCM
+  socket.event({type:'agent_response_complete'});
+  await new Promise(resolve=>setTimeout(resolve,35));assert.equal(completions,0);
+  socket.event({type:'audio',audio_event:{audio_base_64:Buffer.alloc(3200).toString('base64')}});
+  await new Promise(resolve=>setTimeout(resolve,100));assert.equal(completions,0);
+  await new Promise(resolve=>setTimeout(resolve,110));assert.equal(completions,1);
+});
