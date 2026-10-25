@@ -367,3 +367,20 @@ test('semantic routing uses the configured model with attributed bounded context
     conversation:[{userId:'bob',role:'human',text:'Bob: We chose Spring 2027.'}]},new AbortController().signal);
   assert.deepEqual(result,{action:'reply',request:'Find database courses in Spring 2027.'});
 });
+
+test('real Discord playback recovers after a research gap starves the acknowledgement stream',async()=>{
+  const {createAudioPlayer,AudioPlayerStatus,NoSubscriberBehavior,entersState}=await import('@discordjs/voice');
+  const {DiscordSpeechPlayback}=await import('../src/voice/playback.js');
+  const player=createAudioPlayer({behaviors:{noSubscriber:NoSubscriberBehavior.Play}}),playback=new DiscordSpeechPlayback(player);
+  player.on('error',error=>assert.fail(error.message));
+  try{
+    playback.write(Buffer.alloc(6400),16000); // 200ms acknowledgement, then no data during lookup
+    await entersState(player,AudioPlayerStatus.Playing,1500);
+    const first=player.state;assert.ok('resource' in first);
+    await entersState(player,AudioPlayerStatus.Idle,2000);
+    playback.write(Buffer.alloc(6400),16000); // final tool answer must get a NEW playable resource
+    await entersState(player,AudioPlayerStatus.Playing,1500);
+    const second=player.state;assert.ok('resource' in second);assert.notEqual(second.resource,first.resource);
+    playback.finish();await entersState(player,AudioPlayerStatus.Idle,2000);
+  }finally{playback.stop();}
+});

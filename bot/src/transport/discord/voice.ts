@@ -1,24 +1,22 @@
-import { PassThrough } from 'node:stream';
-import { AudioPlayerStatus, createAudioPlayer, createAudioResource, entersState, EndBehaviorType, joinVoiceChannel,
-  NoSubscriberBehavior, StreamType, VoiceConnectionStatus, type VoiceConnection } from '@discordjs/voice';
+import { createAudioPlayer, entersState, EndBehaviorType, joinVoiceChannel,
+  NoSubscriberBehavior, VoiceConnectionStatus, type VoiceConnection } from '@discordjs/voice';
 import { ChannelType, PermissionFlagsBits, type Client, type ChatInputCommandInteraction, type Message } from 'discord.js';
 import type { Config } from '../../config/index.js';
 import type { PlanningApplication } from '../../application/planning.js';
 import { PlanningError, type Actor, type Room } from '../../domain/planning.js';
-import { discordPCM, SpeechDecoder, speechEnergy,SpeechActivityGate } from '../../voice/audio.js';
+import { SpeechDecoder, speechEnergy,SpeechActivityGate } from '../../voice/audio.js';
+import { DiscordSpeechPlayback } from '../../voice/playback.js';
 import { ScribeUtterance } from '../../voice/elevenlabs.js';
 import { addressesRay, VoiceSession, type VoiceBackend } from '../../voice/session.js';
 
-export const voiceNotice = 'Voice Ray sends opted-in audio to ElevenLabs for transcription and conversation. '
-  + 'No wake word is needed: Ray uses conversation context to answer requests and follow-ups; ordinary group discussion is noted quietly. '
-  + 'Transcripts and notes are processed by OpenRouter to decide when to reply and understand preferences. Use /voice join consent:True to opt yourself in, '
-  + '/voice leave to stop including yourself. Session owner/moderators can pause or end listening. '
-  + 'Ray does not save raw audio locally; provider transcript retention is separate.';
+export const voiceNotice = 'Audio goes to ElevenLabs; transcripts and notes go to OpenRouter. '
+  + 'Only opted-in members are included. No local audio recordings; provider retention applies. '
+  + 'Use /voice leave to stop, or /voice pause to pause the room.';
 
 interface LiveVoice {
   room: Room; sessionId: string; ownerId: string; connection: VoiceConnection; session: VoiceSession;
   status?: Message; captures: Map<string, () => void>; timer: ReturnType<typeof setTimeout>;
-  stream?: PassThrough; player: ReturnType<typeof createAudioPlayer>;
+  playback: DiscordSpeechPlayback; player: ReturnType<typeof createAudioPlayer>;
 }
 
 /** One voice room per worker. All controls originate in its linked text channel. */
@@ -58,7 +56,8 @@ export class DiscordVoice {
       }
       const alreadyJoined=this.live!.session.participants.has(actor.userId);
       try { this.live!.session.join(actor); } catch { throw new PlanningError('This demo supports up to four voice participants.'); }
-      await interaction.editReply({content:`You joined Voice Ray. ${voiceNotice}`,allowedMentions:{parse:[]}});
+      await interaction.editReply({content:`You’re in — talk naturally.
+${voiceNotice}`,allowedMentions:{parse:[]}});
       if(!alreadyJoined)void this.live!.session.greet(actor).catch(()=>{});
       return;
     }
@@ -82,34 +81,27 @@ export class DiscordVoice {
     const me = await channel.guild.members.fetchMe();
     if (!channel.permissionsFor(me)?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak])) throw new PlanningError('Ray needs View Channel, Connect and Speak in the voice channel.');
     const connection = joinVoiceChannel({channelId:channel.id,guildId:room.guildId,adapterCreator:channel.guild.voiceAdapterCreator,selfDeaf:false,selfMute:false});
-    const player = createAudioPlayer({behaviors:{noSubscriber:NoSubscriberBehavior.Stop}});
+    const player = createAudioPlayer({behaviors:{noSubscriber:NoSubscriberBehavior.Stop,maxMissedFrames:50}});
     const captures = new Map<string,()=>void>();
     let lastStatus = '';
     const status = (value:string) => {
       if (lastStatus === value) return;
       lastStatus = value;
-      void this.live?.status?.edit({content:`Voice Ray: **${value}**\n${voiceNotice}`,allowedMentions:{parse:[]}}).catch(()=>{});
+      void this.live?.status?.edit({content:`🎙️ Ray · **${value}**`,allowedMentions:{parse:[]}}).catch(()=>{});
     };
-    const stop = () => { const live = this.live; live?.stream?.destroy(); if (live) live.stream=undefined; player.stop(true); };
+    const playback=new DiscordSpeechPlayback(player,finished=>status(finished?'listening':'thinking'));
+    const stop = () => playback.stop();
     const session = new VoiceSession(this.config,this.backend(room,sessionId),{
       stop,status,
-      finish:()=>{if(this.live?.stream)this.live.stream.end();else status('listening');},
+      finish:()=>{if(!playback.finish())status('listening');},
       audio:(pcm,rate)=>{
-        const live=this.live;if(!live)return;
-        if(!live.stream){
-          live.stream=new PassThrough();
-          player.play(createAudioResource(live.stream,{inputType:StreamType.Raw}));
-        }
-        if(live.stream.writableLength>12_000_000){session.interrupt();status('Voice output was too long. Ask for a shorter answer.');return;}
-        live.stream.write(discordPCM(pcm,rate));
+        if(!this.live)return;
+        try{playback.write(pcm,rate);}catch{session.interrupt();status('Audio playback failed. Please ask again.');}
       },
     });
     const timer=setTimeout(()=>this.close(),this.config.VOICE_MAX_DURATION_SECONDS*1000);
-    this.live={room,sessionId,ownerId,connection,session,player,captures,timer};
+    this.live={room,sessionId,ownerId,connection,session,player,playback,captures,timer};
     player.on('error',()=>{session.interrupt();status('Audio playback failed. Ask Ray again.');});
-    player.on(AudioPlayerStatus.Idle,()=>{
-      if(this.live?.stream?.writableEnded){this.live.stream=undefined;status('listening');}
-    });
     connection.on('error',()=>this.close());
     connection.on(VoiceConnectionStatus.Disconnected,()=>this.close());
     connection.receiver.speaking.on('start',userId=>{void this.capture(userId).catch(()=>status('Could not hear that turn. Please try again.'));});
@@ -117,7 +109,7 @@ export class DiscordVoice {
       await entersState(connection,VoiceConnectionStatus.Ready,15000);connection.subscribe(player);
       const text=await this.client.channels.fetch(room.channelId);
       if(!text||text.type!==ChannelType.GuildText)throw new Error('Planning channel unavailable.');
-      this.live.status=await text.send({content:`Voice Ray: **listening**\n${voiceNotice}`,allowedMentions:{parse:[]}});
+      this.live.status=await text.send({content:'🎙️ Ray · **listening**',allowedMentions:{parse:[]}});
     }catch{this.close();throw new PlanningError('Ray could not connect to voice. Check voice permissions, UDP access and encryption support.');}
   }
 
