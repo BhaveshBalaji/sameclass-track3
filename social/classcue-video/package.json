@@ -1,0 +1,20 @@
+{
+  "dependencies": {
+    "ffmpeg-static": "5.3.0",
+    "ffprobe-static": "3.1.0",
+    "gsap": "3.15.0",
+    "hyperframes": "0.8.195"
+  },
+  "name": "classcue-social-video",
+  "private": true,
+  "description": "28-second ClassCue demo authored with HyperFrames.",
+  "scripts": {
+    "prepare-media": "python3 prepare.py",
+    "check": "bash tools/hyperframes.sh check",
+    "preview": "bash tools/hyperframes.sh preview --background",
+    "render": "bash tools/hyperframes.sh render --quality high --fps 30 --workers 2 --output classcue-social-28s.mp4"
+  },
+  "devDependencies": {
+    "@hyperframes/producer": "0.8.195"
+  }
+}

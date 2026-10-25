@@ -1,0 +1,15 @@
+Registration prep, minus the tab chaos 💙
+
+Meet ClassCue, a skill for Cubbie. Text your semester and interests, then compare ASU course options, meeting times, and professor review tradeoffs in one conversation.
+
+Built by Inert SI for the Cubbie Hackathon.
+
+Try ClassCue + vote: links in bio.
+
+Planning recommendations only. Verify current seats, prerequisites, and enrollment eligibility with ASU. Professor reviews reflect student opinions.
+
+#ASU #Cubbie #ClassRegistration #StudentLife #CollegeTech
+
+BIO LINKS TO SET BEFORE POSTING
+Install: https://github.com/aniiishhh/cubbie-class-registration-buddy/tree/main/asu-registration-buddy
+Voting: https://hackathon.cubbie.ai/#gallery (replace with the direct ClassCue entry link when available)

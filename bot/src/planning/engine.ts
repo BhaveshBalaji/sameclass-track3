@@ -22,7 +22,7 @@ export class GroupPlanningEngine implements GroupPlanner{
   async recommend(original:PlanningSession,question:string,parentSignal:AbortSignal):Promise<Recommendation>{
     const session=attendanceSession(original),signal=AbortSignal.any([parentSignal,AbortSignal.timeout(this.limits.timeoutMs)]);
     const budget:ResearchBudget={signal,tools:0,models:0,maxTools:this.limits.sourceCalls??24,maxModels:0,refresh:false};
-    let projection:Projection={queries:[],participants:[]},sections:Section[]=[],ranked:Candidate[]=[],notes:string[]=[],researched:Candidate[]=[];
+    let projection:Projection={queries:[],participants:[]},sections:Section[]=[],ranked:Candidate[]=[],notes:string[]=[];
     const graph=new StateGraph(new StateSchema({requestId:z.string(),status:z.string()}))
       .addNode('interpret',async()=>{
         signal.throwIfAborted();projection=attendanceProjection(session,includeCourseFamilies(session,await this.projector.project(session,question,signal)));
@@ -65,17 +65,25 @@ export class GroupPlanningEngine implements GroupPlanner{
           await provider.answer(`For ${candidate.section.subject} ${candidate.section.catalog_nbr} in ${semesterName(session.term)}, section ${candidate.section.class_nbr}, retrieve assessment and review evidence only.`,session.term,{turns:[],signal});
           return {sectionId:candidate.section.class_nbr,evidence:[],limitations:['Structured evidence unavailable.']};
         };
-        const results:PromiseSettledResult<OfferingResearch>[]=[];
-        if(this.limits.parallel===false){for(const candidate of shortlist){try{results.push({status:'fulfilled',value:await inspect(candidate)});}catch(reason){results.push({status:'rejected',reason});}}}
-        else results.push(...await Promise.allSettled(shortlist.map(inspect)));
-        results.forEach((result,index)=>{
-          const candidate=shortlist[index]!;
-          candidate.research=result.status==='fulfilled'&&result.value.sectionId===candidate.section.class_nbr?result.value:
-            {sectionId:candidate.section.class_nbr,evidence:[],limitations:['Section research unavailable or mismatched.']};
-        });
-        researched=shortlist;
-        for(const candidate of shortlist)qualitySignals(session,candidate);
-        if(this.softFit){try{await this.softFit.assess(session,shortlist.map(candidate=>({candidate,text:'',records:candidate.research!.evidence})),signal);}catch{notes.push('Evidence analysis unavailable.');}}
+        const enrich=async(batch:Candidate[])=>{
+          if(!batch.length)return;
+          const results:PromiseSettledResult<OfferingResearch>[]=[];
+          if(this.limits.parallel===false){for(const candidate of batch){try{results.push({status:'fulfilled',value:await inspect(candidate)});}catch(reason){results.push({status:'rejected',reason});}}}
+          else results.push(...await Promise.allSettled(batch.map(inspect)));
+          results.forEach((result,index)=>{
+            const candidate=batch[index]!;
+            candidate.research=result.status==='fulfilled'&&result.value.sectionId===candidate.section.class_nbr?result.value:
+              {sectionId:candidate.section.class_nbr,evidence:[],limitations:['Section research unavailable or mismatched.']};
+            qualitySignals(session,candidate);
+          });
+          if(this.softFit){try{await this.softFit.assess(session,batch.map(candidate=>({candidate,text:'',records:candidate.research!.evidence})),signal);}catch{notes.push('Evidence analysis unavailable.');}}
+        };
+        await enrich(shortlist);
+        // Evidence may change the selected plan. Fetch the newly assigned choices
+        // once within the SAME deadline/source budget instead of presenting them
+        // with sources from a different shortlist. Do not retry failed candidates.
+        const followup=[...new Set(allocate(session,ranked).students.flatMap(s=>s.candidates))].filter(c=>!c.research).slice(0,this.limits.shortlist);
+        await enrich(followup);
         if(shortlist.length<ranked.filter(c=>c.fits.some(f=>eligible(c,f.userId))).length)notes.push('Research shortlist limit.');
         return {status:'researched'};
       }).addEdge(START,'interpret').addEdge('interpret','catalog').addEdge('catalog','match').addEdge('match','research').addEdge('research',END).compile();
@@ -84,7 +92,8 @@ export class GroupPlanningEngine implements GroupPlanner{
     if(!projection.queries.length)return {text:'A subject/level, topic or specific course is enough to start discovery. I could not derive a search from the saved facts yet; an approved list is not required.',sectionIds:[]};
     if(!ranked.length)return {text:'No usable sections were returned in this bounded search. Your requirements are unchanged.',sectionIds:[]};
     // Rank and present the same scoped evidence. Never append competing worker recommendation paragraphs.
-    const finalPool=researched.length?researched:ranked;
-    return renderPlan(session,allocate(session,finalPool),ranked,notes);
+    // Research enriches candidates; the source budget must not erase otherwise
+    // compatible individual alternatives or prevent filling a student's request.
+    return renderPlan(session,allocate(session,ranked),ranked,notes);
   }
 }

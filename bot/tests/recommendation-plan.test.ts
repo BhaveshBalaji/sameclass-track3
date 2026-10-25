@@ -18,7 +18,9 @@ import {discordContent} from '../src/transport/discord/index.js';
 import {PlanningResearchClient} from '../src/planning/research.js';
 import {ResearchSources} from '../src/research/sources.js';
 import {APIClient} from '../src/integrations/api.js';
-import {qualitySignals} from '../src/planning/quality.js';
+import {qualitySignals,officialTopicReasons} from '../src/planning/quality.js';
+import {PlanningCatalogClient} from '../src/planning/catalog.js';
+import {renderPlan} from '../src/planning/render.js';
 
 const config=parseConfig({OPENROUTER_API_KEY:'test-only'});
 const template:Section=JSON.parse(await readFile(join(repoRoot,'class_search_api/example_response.json'),'utf8')).results[0];
@@ -137,4 +139,57 @@ test('parallel evidence has identical scoped output and fewer elapsed waits; eve
   const rendered=discordContent(body,0,body.text);assert.match(rendered.content,new RegExp(`<@${ann}>`));assert.match(rendered.content,new RegExp(`<@${bhav}>`));assert.deepEqual(rendered.users,[ann,bhav]);
   assert.deepEqual(discordContent({...body,mentions:[ann]},1,'[[ray-member:1]]').users,[]);
   console.log(JSON.stringify({benchmark:'controlled 45ms source operations, not live-provider performance',sequentialMs:sequential.elapsedMs,parallelMs:parallel.elapsedMs,sequentialPeak:sequential.peak,parallelPeak:parallel.peak,identicalRecommendations:true}));
+});
+
+test('subject and keyword search caches remain isolated, including concurrent lookups',async()=>{
+  let calls=0;
+  const source=new PlanningCatalogClient(new APIClient('https://asu.test',1000,async input=>{
+    calls++;const q=new URL(String(input)).searchParams;
+    const row={...section('93001','571',['MON'],'14:00','15:00'),subject:q.get('subject')!,title:q.get('keyword')||'All topics'};
+    return Response.json({count:1,total:1,results:[row],complete:true,stop_reason:'exhausted',pages_fetched:1,retrieved_at:'2026-10-25T11:40:00Z'});
+  }),new ResearchScheduler());
+  const queries=[{term:'2271',subject:'CSE'},{term:'2271',subject:'MAT'},
+    {term:'2271',subject:'CSE',catalog:'571',keyword:'AI'},
+    {term:'2271',subject:'CSE',catalog:'571',keyword:'robotics'}];
+  const results=await Promise.all(queries.map(q=>source.search(q,AbortSignal.timeout(2000))));
+  assert.deepEqual(results.map(r=>r.results[0]!.subject),['CSE','MAT','CSE','CSE']);
+  assert.deepEqual(results.slice(2).map(r=>r.results[0]!.title),['AI','robotics']);
+  await source.search(queries[0]!,AbortSignal.timeout(2000));assert.equal(calls,4);
+});
+
+test('bounded research does not drop compatible individual additions from the final plan',async()=>{
+  const session=scenario();
+  const sections=[section('94001','571',['MON'],'14:00','15:00'),section('94002','575',['WED'],'15:00','16:00')];
+  const researched:string[]=[];
+  const engine=new GroupPlanningEngine({async project(s){return projection(s);}},{async search(){return {count:2,total:2,results:sections,complete:true,stop_reason:'exhausted',pages_fetched:1,retrieved_at:'2026-10-25T11:40:00Z'};}},
+    {async inspect(s){researched.push(s.class_nbr);if(researched.length>1)throw Error('Controlled follow-up source failure');return researchFor(s.class_nbr);}},{candidates:12,shortlist:1,timeoutMs:2000});
+  const result=await engine.recommend(session,'Plan courses for us',AbortSignal.timeout(2000));
+  assert.equal(researched.length,2);assert.equal(new Set(researched).size,2);
+  assert.deepEqual(result.assignments!.map(s=>s.sectionIds.length),[2,1]);
+  assert.match(result.text,/Best common course in this plan/);assert.match(result.text,/Your preferences:.*AI\/ML/);
+  assert.match(result.text,/Interest\/workload fit is not yet established/);
+  assert.match(result.text,/Syllabus: usable text unavailable/);
+});
+
+test('individual topic reasons require matching official evidence and never establish easy workload',()=>{
+  const session=scenario(),candidate=matched(session,[section('96001','572',['MON'],'14:00','15:00','Data Mining')])[0]!;
+  assert.deepEqual(officialTopicReasons(session.participants[bhav]!,candidate),[]);
+  candidate.research={sectionId:'96001',evidence:[record('d','course_details',{description:'Data mining techniques: classification, clustering and association.'})],limitations:[]};
+  assert.match(officialTopicReasons(session.participants[bhav]!,candidate).join(' '),/classification.*AI\/ML/);
+  assert.deepEqual(officialTopicReasons(session.participants[ann]!,candidate),[]);
+  assert.doesNotMatch(officialTopicReasons(session.participants[bhav]!,candidate).join(' '),/easy|NLP/);
+  const before=candidate.fits.map(f=>f.softScore);qualitySignals(session,candidate);
+  assert.equal(candidate.fits.find(f=>f.userId===ann)!.softScore,before[0]);
+  assert.equal(candidate.fits.find(f=>f.userId===bhav)!.softScore,before[1]!+2);
+  candidate.research.evidence[0]!.status='unavailable';assert.deepEqual(officialTopicReasons(session.participants[bhav]!,candidate),[]);
+});
+
+test('partial sharing names the covered students and does not claim an everyone match',()=>{
+  const session=attendanceSession(scenario()),third='333333333333333333';
+  session.participants[third]={userId:third,name:'Silent Student',active:true,cursor:0,silenceAsked:false,profile:{version:0,facts:{}}};
+  const candidates=matched(session,[section('95001','571',['MON'],'14:00','15:00')]);
+  const result=renderPlan(session,allocate(session,candidates),candidates,[]);
+  assert.match(result.text,/Best partial-group course in this plan/);
+  assert.match(result.text,/for Anish \+ Bhavshu/);assert.match(result.text,/No course was selected for everyone/);
+  assert.doesNotMatch(result.text,/It meets everyone/);assert.equal(result.assignments!.find(s=>s.userId===third)!.sectionIds.length,0);
 });

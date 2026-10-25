@@ -1,0 +1,4 @@
+node_modules/
+.hyperframes/
+qa/
+assets/voice.wav

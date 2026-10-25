@@ -1,0 +1,67 @@
+1
+00:00:00,350 --> 00:00:02,005
+Picking classes shouldn’t take
+
+2
+00:00:02,030 --> 00:00:03,365
+twenty tabs.
+
+3
+00:00:03,390 --> 00:00:05,685
+So I texted Cubbie what I wanted.
+
+4
+00:00:05,710 --> 00:00:06,565
+ClassCue brings
+
+5
+00:00:06,590 --> 00:00:08,085
+ASU class details
+
+6
+00:00:08,110 --> 00:00:09,925
+and Rate My Professors insights
+
+7
+00:00:09,950 --> 00:00:11,045
+into the chat.
+
+8
+00:00:11,070 --> 00:00:12,085
+Three options,
+
+9
+00:00:12,110 --> 00:00:13,805
+with times and workload tradeoffs
+
+10
+00:00:13,830 --> 00:00:16,785
+I can actually compare.
+
+11
+00:00:16,810 --> 00:00:18,225
+Want more machine learning?
+
+12
+00:00:18,250 --> 00:00:20,185
+There’s another option.
+
+13
+00:00:20,210 --> 00:00:21,065
+ClassCue.
+
+14
+00:00:21,090 --> 00:00:22,505
+A skill for Cubbie.
+
+15
+00:00:22,530 --> 00:00:24,625
+Plan before registration day.
+
+16
+00:00:24,650 --> 00:00:25,185
+Try it,
+
+17
+00:00:25,210 --> 00:00:26,910
+and vote for ClassCue.

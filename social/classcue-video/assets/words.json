@@ -1,0 +1,356 @@
+[
+  {
+    "text": "Picking",
+    "type": "word",
+    "start": 0,
+    "end": 0.32
+  },
+  {
+    "text": "classes",
+    "type": "word",
+    "start": 0.4,
+    "end": 0.88
+  },
+  {
+    "text": "shouldn\u2019t",
+    "type": "word",
+    "start": 1.04,
+    "end": 1.28
+  },
+  {
+    "text": "take",
+    "type": "word",
+    "start": 1.36,
+    "end": 1.6
+  },
+  {
+    "text": "twenty",
+    "type": "word",
+    "start": 1.68,
+    "end": 1.92
+  },
+  {
+    "text": "tabs.",
+    "type": "word",
+    "start": 2,
+    "end": 2.64
+  },
+  {
+    "text": "So",
+    "type": "word",
+    "start": 3.04,
+    "end": 3.2
+  },
+  {
+    "text": "I",
+    "type": "word",
+    "start": 3.44,
+    "end": 3.6
+  },
+  {
+    "text": "texted",
+    "type": "word",
+    "start": 3.72,
+    "end": 3.92
+  },
+  {
+    "text": "Cubbie",
+    "type": "word",
+    "start": 4,
+    "end": 4.24
+  },
+  {
+    "text": "what",
+    "type": "word",
+    "start": 4.32,
+    "end": 4.4
+  },
+  {
+    "text": "I",
+    "type": "word",
+    "start": 4.44,
+    "end": 4.48
+  },
+  {
+    "text": "wanted.",
+    "type": "word",
+    "start": 4.56,
+    "end": 4.96
+  },
+  {
+    "text": "ClassCue",
+    "type": "word",
+    "start": 5.36,
+    "end": 5.84
+  },
+  {
+    "text": "brings",
+    "type": "word",
+    "start": 5.92,
+    "end": 6.16
+  },
+  {
+    "text": "ASU",
+    "type": "word",
+    "start": 6.24,
+    "end": 6.72
+  },
+  {
+    "text": "class",
+    "type": "word",
+    "start": 6.8,
+    "end": 7.12
+  },
+  {
+    "text": "details",
+    "type": "word",
+    "start": 7.4,
+    "end": 7.68
+  },
+  {
+    "text": "and",
+    "type": "word",
+    "start": 7.76,
+    "end": 8
+  },
+  {
+    "text": "Rate",
+    "type": "word",
+    "start": 8.08,
+    "end": 8.24
+  },
+  {
+    "text": "My",
+    "type": "word",
+    "start": 8.32,
+    "end": 8.4
+  },
+  {
+    "text": "Professors",
+    "type": "word",
+    "start": 8.52,
+    "end": 8.96
+  },
+  {
+    "text": "insights",
+    "type": "word",
+    "start": 9.04,
+    "end": 9.52
+  },
+  {
+    "text": "into",
+    "type": "word",
+    "start": 9.6,
+    "end": 9.76
+  },
+  {
+    "text": "the",
+    "type": "word",
+    "start": 9.84,
+    "end": 9.92
+  },
+  {
+    "text": "chat.",
+    "type": "word",
+    "start": 10,
+    "end": 10.52
+  },
+  {
+    "text": "Three",
+    "type": "word",
+    "start": 10.72,
+    "end": 10.88
+  },
+  {
+    "text": "options,",
+    "type": "word",
+    "start": 10.96,
+    "end": 11.68
+  },
+  {
+    "text": "with",
+    "type": "word",
+    "start": 11.76,
+    "end": 11.84
+  },
+  {
+    "text": "times",
+    "type": "word",
+    "start": 11.92,
+    "end": 12.32
+  },
+  {
+    "text": "and",
+    "type": "word",
+    "start": 12.36,
+    "end": 12.4
+  },
+  {
+    "text": "workload",
+    "type": "word",
+    "start": 12.48,
+    "end": 12.88
+  },
+  {
+    "text": "tradeoffs",
+    "type": "word",
+    "start": 12.96,
+    "end": 13.44
+  },
+  {
+    "text": "I",
+    "type": "word",
+    "start": 13.48,
+    "end": 13.52
+  },
+  {
+    "text": "can",
+    "type": "word",
+    "start": 13.6,
+    "end": 13.84
+  },
+  {
+    "text": "actually",
+    "type": "word",
+    "start": 14.08,
+    "end": 14.32
+  },
+  {
+    "text": "compare.",
+    "type": "word",
+    "start": 14.4,
+    "end": 15.16
+  },
+  {
+    "text": "Want",
+    "type": "word",
+    "start": 15.36,
+    "end": 15.52
+  },
+  {
+    "text": "more",
+    "type": "word",
+    "start": 15.6,
+    "end": 15.76
+  },
+  {
+    "text": "machine",
+    "type": "word",
+    "start": 15.92,
+    "end": 16.08
+  },
+  {
+    "text": "learning?",
+    "type": "word",
+    "start": 16.16,
+    "end": 16.64
+  },
+  {
+    "text": "There\u2019s",
+    "type": "word",
+    "start": 16.8,
+    "end": 16.96
+  },
+  {
+    "text": "another",
+    "type": "word",
+    "start": 17.12,
+    "end": 17.28
+  },
+  {
+    "text": "option.",
+    "type": "word",
+    "start": 17.36,
+    "end": 17.96
+  },
+  {
+    "text": "ClassCue.",
+    "type": "word",
+    "start": 18.16,
+    "end": 18.8
+  },
+  {
+    "text": "A",
+    "type": "word",
+    "start": 19.04,
+    "end": 19.12
+  },
+  {
+    "text": "skill",
+    "type": "word",
+    "start": 19.2,
+    "end": 19.52
+  },
+  {
+    "text": "for",
+    "type": "word",
+    "start": 19.6,
+    "end": 19.68
+  },
+  {
+    "text": "Cubbie.",
+    "type": "word",
+    "start": 19.76,
+    "end": 20.32
+  },
+  {
+    "text": "Plan",
+    "type": "word",
+    "start": 20.48,
+    "end": 20.72
+  },
+  {
+    "text": "before",
+    "type": "word",
+    "start": 20.8,
+    "end": 21.12
+  },
+  {
+    "text": "registration",
+    "type": "word",
+    "start": 21.2,
+    "end": 21.84
+  },
+  {
+    "text": "day.",
+    "type": "word",
+    "start": 21.92,
+    "end": 22.48
+  },
+  {
+    "text": "Try",
+    "type": "word",
+    "start": 22.6,
+    "end": 22.72
+  },
+  {
+    "text": "it,",
+    "type": "word",
+    "start": 22.8,
+    "end": 23.12
+  },
+  {
+    "text": "and",
+    "type": "word",
+    "start": 23.16,
+    "end": 23.2
+  },
+  {
+    "text": "vote",
+    "type": "word",
+    "start": 23.36,
+    "end": 23.52
+  },
+  {
+    "text": "for",
+    "type": "word",
+    "start": 23.56,
+    "end": 23.6
+  },
+  {
+    "text": "ClassCue.",
+    "type": "word",
+    "start": 23.76,
+    "end": 24.64
+  }
+]

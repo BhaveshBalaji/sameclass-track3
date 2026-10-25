@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1080,height=1920">
+<title>ClassCue — Your semester starts with a text</title>
+<script src="assets/gsap.min.js"></script>
+<style>
+:root{--bg:#0a101b;--screen:#101113;--bubble:#303237;--blue:#087dff;--ink:#f7f9fd;--muted:#bcc6d8}
+*{box-sizing:border-box}html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:var(--bg);color:var(--ink);font-family:Arial,"Helvetica Neue",sans-serif}
+#main{width:1080px;height:1920px;position:relative;overflow:hidden;background:var(--bg)}
+.glow{position:absolute;width:1000px;height:1000px;border-radius:50%;background:radial-gradient(circle,rgba(8,125,255,.19),rgba(8,125,255,0) 69%);left:40px;top:460px;pointer-events:none}
+.orbit{position:absolute;width:1100px;height:1100px;border:1px solid #1d2d44;border-radius:50%;left:-10px;top:600px;opacity:.5}
+.brand{position:absolute;top:94px;left:90px;right:90px;display:flex;align-items:center;justify-content:space-between;font-size:26px;letter-spacing:3px;font-weight:700;color:var(--muted)}
+.brand .name{color:var(--ink);letter-spacing:-1px;font-size:34px}.brand .tiny-dot{color:#60a8ff}
+.headlines{position:absolute;left:80px;right:80px;top:166px;height:164px;text-align:center}
+.headline{position:absolute;inset:0;font-size:76px;font-weight:800;line-height:1.03;letter-spacing:-3.4px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.headline:not(:first-child){opacity:0}.accent{color:#6cb2ff}.headline .sub{font-size:34px;line-height:1.2;font-weight:400;letter-spacing:-.6px;color:var(--muted);margin-top:12px}
+.phone{position:absolute;left:130px;top:370px;width:820px;height:1700px;border-radius:108px;padding:15px;background:linear-gradient(100deg,#7c879a,#293341 10%,#111822 32%,#111822 68%,#3a475a 91%,#818b9c);box-shadow:0 40px 85px #0009,0 0 0 3px #506078;transform-origin:50% 35%}
+.screen{height:100%;width:100%;border-radius:94px;overflow:hidden;background:var(--screen);position:relative;border:3px solid #050609}
+.status{height:100px;padding:36px 45px 12px;display:flex;align-items:center;justify-content:space-between;font-size:29px;font-weight:700;letter-spacing:-.5px}
+.island{width:206px;height:58px;border-radius:35px;background:#030405;position:absolute;top:24px;left:calc(50% - 103px)}
+.status-icons{display:flex;align-items:center;gap:12px;font-size:25px}.battery{width:46px;height:23px;border:2px solid #f7f9fd;border-radius:7px;padding:3px;position:relative}.battery:before{content:"";display:block;width:100%;height:100%;border-radius:3px;background:#f7f9fd}.battery:after{content:"";position:absolute;width:4px;height:9px;background:#f7f9fd;right:-7px;top:5px;border-radius:2px}
+.contact{height:128px;padding:6px 36px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #282b30;background:#15171b}
+.back{font-size:68px;font-weight:300;color:#5aa5ff;line-height:1}.contact-center{display:flex;align-items:center;gap:20px}.avatar{height:66px;width:66px;background:#1459c2;border-radius:50%;display:grid;place-items:center;font-size:40px;font-weight:800;box-shadow:inset 0 0 0 2px #66adff}.contact-name{font-size:34px;font-weight:700;letter-spacing:-.6px}.contact-note{font-size:22px;color:#bcc6d8;margin-top:6px}.video-icon{width:39px;height:28px;border:3px solid #5aa5ff;border-radius:7px;position:relative}.video-icon:after{content:"";position:absolute;right:-16px;top:3px;border-right:12px solid #5aa5ff;border-top:8px solid transparent;border-bottom:8px solid transparent}
+.chat{position:relative;height:880px;overflow:hidden;margin-top:0}
+.pane{position:absolute;inset:0;background:var(--screen);opacity:0}.pane:first-child{opacity:1}
+.pane-content{display:flex;flex-direction:column;gap:24px;align-items:flex-start;width:100%;height:100%;padding:28px 30px 22px}
+.timestamp{width:100%;text-align:center;font-size:21px;color:#a8b0be;padding:0 0 4px}
+.bubble{padding:23px 26px;border-radius:34px;font-size:39px;line-height:1.19;letter-spacing:-.8px;max-width:94%;background:var(--bubble);position:relative;box-shadow:0 2px 1px #0001}
+.bubble.out{align-self:flex-end;background:var(--blue);border-bottom-right-radius:10px}.bubble.in{border-bottom-left-radius:10px}
+.bubble.small{font-size:34px}.bubble.mini{font-size:28px;line-height:1.3;max-width:100%}.read{font-size:22px;color:#b8bec8;align-self:flex-end;padding-right:10px;margin-top:-12px}
+.typing{background:var(--bubble);border-radius:34px 34px 34px 9px;height:66px;width:125px;padding:23px 21px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}.typing span{width:18px;height:18px;border-radius:50%;background:#bfc4cb;display:block}
+.source-list{display:flex;flex-direction:column;gap:20px;width:100%}.source{padding:22px 24px;background:#202a38;border:1px solid #3a506c;border-radius:26px;display:flex;align-items:center;gap:22px;min-height:108px}.source-icon{width:57px;height:57px;border-radius:17px;background:#0e4e9e;display:grid;place-items:center;font-size:31px;font-weight:700;flex-shrink:0}.source-title{font-size:34px;font-weight:700;letter-spacing:-.6px}.source-meta{font-size:24px;color:#c4d0e0;margin-top:5px}.source-check{margin-left:auto;color:#83bcff;font-size:34px}
+.source-note{font-size:24px;line-height:1.35;color:#b9c4d7;padding:2px 4px;max-width:100%}
+.kicker{font-size:24px;letter-spacing:2px;color:#8bbfff;font-weight:700;text-transform:uppercase}
+.course{width:100%;background:#2b2e34;border-radius:29px;padding:23px 25px;border:1px solid #414651;display:flex;flex-direction:column;gap:9px;flex-shrink:0}
+.course-top{display:flex;align-items:center;justify-content:space-between}.code{font-size:38px;font-weight:800;letter-spacing:-1px}.fit{font-size:21px;background:#15375c;color:#b5d8ff;padding:7px 11px;border-radius:12px}.course-title{font-size:32px;line-height:1.12;letter-spacing:-.8px;font-weight:600}.course-time{font-size:25px;color:#ced5df;font-variant-numeric:tabular-nums}.courses .pane-content{gap:16px;padding-top:26px}
+.courses .bubble{font-size:32px}.courses .source-note{font-size:23px}
+.evidence .pane-content{gap:22px;padding:32px 30px}.proof-pill{font-size:24px;color:#adceff;border:1px solid #38577c;padding:9px 14px;border-radius:18px;display:inline-flex;align-items:center;gap:10px}.proof-dot{width:9px;height:9px;background:#5fa7ff;border-radius:50%}.evidence-title{font-size:44px;letter-spacing:-1.7px;line-height:1.1;font-weight:800}
+.capture-window{position:relative;width:100%;height:154px;overflow:hidden;border-radius:23px;background:#383838;border:1px solid #5c626c;flex-shrink:0}.capture-window img{position:absolute;width:100%;max-width:none;left:0;top:0;height:auto}
+.quote-card{width:100%;padding:27px 28px;background:#253448;border:1px solid #48678c;border-radius:27px}.quote-card .label{font-size:23px;color:#b9d9ff;margin-bottom:15px}.quote-main{font-size:42px;line-height:1.16;letter-spacing:-1px}.quote-trade{font-size:34px;line-height:1.2;color:#c8d2e2;margin-top:17px}.evidence .source-note{font-size:23px}
+.alternative .pane-content{gap:26px}.alternative .course{background:#182f49;border-color:#4475a7;padding:30px}.alternative .course-title{font-size:42px;line-height:1.08}.alternative .code{font-size:48px}.alternative .source-note{font-size:25px}.swap{font-size:25px;color:#b8cfe9;display:flex;align-items:center;gap:13px;padding:0 4px}.swap .arrow{color:#78b6ff;font-size:36px}
+.end .pane-content{align-items:center;justify-content:center;gap:24px;padding:25px 40px 36px;text-align:center}.end-avatar{width:132px;height:132px;border-radius:38px;background:#087dff;display:grid;place-items:center;font-size:76px;font-weight:800;box-shadow:0 15px 50px #087dff35}.end-logo{font-size:86px;letter-spacing:-5px;font-weight:800;line-height:1}.end-sub{font-size:32px;color:#c1d2e8;line-height:1.2}.end-title{font-size:52px;letter-spacing:-2px;line-height:1.03;font-weight:700;max-width:570px;margin-top:6px}.cta{padding:23px 28px;background:#087dff;border-radius:26px;font-size:35px;font-weight:700;line-height:1.15;margin-top:12px}.end-link{font-size:25px;color:#aac8ed}.end-note{font-size:22px;color:#bcc6d8;line-height:1.3;max-width:580px}
+.composer{height:92px;padding:15px 27px;display:flex;align-items:center;gap:15px;border-top:1px solid #292c31}.plus{font-size:46px;color:#ccd2da;width:45px}.compose-field{border:2px solid #454b56;border-radius:35px;min-height:61px;flex:1;display:flex;align-items:center;padding:10px 18px;font-size:26px;color:#bcc6d8;overflow:hidden;white-space:nowrap}.compose-send{width:38px;height:38px;border-radius:50%;background:#087dff;color:#f7f9fd;display:grid;place-items:center;font-size:26px;margin-left:auto;flex-shrink:0}.cursor{display:inline-block;width:2px;height:28px;background:#7bb9ff;margin-left:2px}
+.caption-zone{position:absolute;left:72px;right:72px;top:1620px;height:124px;z-index:9;pointer-events:none}.caption{position:absolute;left:0;right:0;top:0;display:flex;justify-content:center;align-items:center;min-height:110px;text-align:center;font-size:49px;line-height:1.12;font-weight:700;letter-spacing:-1px;opacity:0}.caption span{display:inline-block;background:#0a101bf2;padding:17px 27px;border-radius:24px;max-width:920px;box-shadow:0 8px 25px #0005}
+.demo-label{position:absolute;top:1776px;left:65px;right:65px;text-align:center;font-size:22px;letter-spacing:.2px;color:#bac6d9;z-index:9}
+.progress{position:absolute;left:90px;top:1830px;width:900px;height:4px;background:#2a3b53;border-radius:3px;overflow:hidden}.progress-fill{width:100%;height:100%;background:#68aeff;transform-origin:0 50%}
+.home-indicator{position:absolute;bottom:14px;left:calc(50% - 130px);height:7px;width:260px;border-radius:8px;background:#e1e6ee}
+/* Reading labels remain readable after the phone's camera movement. */
+.brand{font-size:30px}.status{font-size:31px}.contact-note{font-size:30px}.timestamp,.read{font-size:30px}
+.source-meta,.source-note,.kicker,.course-time,.swap,.end-link{font-size:30px}
+.courses .source-note,.evidence .source-note,.alternative .source-note{font-size:30px}
+.fit{font-size:28px}.proof-pill,.quote-card .label{font-size:30px}
+.end .pane-content{gap:18px}.end-avatar{width:112px;height:112px;font-size:70px}.end-logo{font-size:82px}.end-note{font-size:30px}
+.demo-label{font-size:28px}.compose-field{font-size:30px}
+</style>
+</head>
+<body>
+<div data-hf-id="hf-lb6t" id="main" data-composition-id="main" data-start="0" data-duration="28" data-width="1080" data-height="1920" data-fps="30">
+ <div data-hf-id="hf-78qa" class="glow" data-layout-ignore></div><div data-hf-id="hf-zcoh" class="orbit" data-layout-ignore></div>
+ <div data-hf-id="hf-oojr" class="brand"><span data-hf-id="hf-d8qv" class="name">ClassCue<span data-hf-id="hf-wbwt" class="tiny-dot">.</span></span><span data-hf-id="hf-60j0">A SKILL FOR CUBBIE</span></div>
+ <div data-hf-id="hf-jgnf" class="headlines">
+  <div data-hf-id="hf-na2f" class="headline" id="h1"><span data-hf-id="hf-2k1z">Picking classes =</span><span data-hf-id="hf-2p8o" class="accent">20 tabs?</span></div>
+  <div data-hf-id="hf-ceks" class="headline" id="h2"><span data-hf-id="hf-w8nv">Your next semester.</span><span data-hf-id="hf-je22" class="accent">One conversation.</span></div>
+  <div data-hf-id="hf-fdud" class="headline" id="h3"><span data-hf-id="hf-o90r">Classes that fit.</span><span data-hf-id="hf-khcf" class="accent">Tradeoffs explained.</span></div>
+  <div data-hf-id="hf-vxya" class="headline" id="h4"><span data-hf-id="hf-yuf2">Want more ML?</span><span data-hf-id="hf-52na" class="accent">Just ask.</span></div>
+  <div data-hf-id="hf-zw2b" class="headline" id="h5"><span data-hf-id="hf-5hnf">Registration day?</span><span data-hf-id="hf-i3c6" class="accent">Come prepared.</span></div>
+ </div>
+ <div data-hf-id="hf-bhzh" class="phone" data-layout-allow-overflow>
+  <div data-hf-id="hf-cdmk" class="screen">
+   <div data-hf-id="hf-8kim" class="status"><span data-hf-id="hf-zwmt">9:41</span><span data-hf-id="hf-ptf0" class="status-icons">▮▮▮ <span data-hf-id="hf-7t7z">◔</span><span data-hf-id="hf-m7us" class="battery"></span></span></div><div data-hf-id="hf-7sfr" class="island"></div>
+   <div data-hf-id="hf-v0ro" class="contact"><span data-hf-id="hf-n737" class="back">‹</span><div data-hf-id="hf-1fmq" class="contact-center"><div data-hf-id="hf-mm6w" class="avatar">c</div><div data-hf-id="hf-yeow"><div data-hf-id="hf-5fq0" class="contact-name">Cubbie 💙</div><div data-hf-id="hf-q7nj" class="contact-note">iMessage</div></div></div><span data-hf-id="hf-0dsg" class="video-icon"></span></div>
+   <div data-hf-id="hf-vshe" class="chat">
+    <section data-hf-id="hf-ar0f" class="pane" id="request"><div data-hf-id="hf-jvjm" class="pane-content">
+     <div data-hf-id="hf-5kfb" class="timestamp">Today 9:41 AM</div>
+     <div data-hf-id="hf-r5lk" class="bubble out" id="msg1">cubbie, help me pick classes 😭</div>
+     <div data-hf-id="hf-fnke" class="bubble out small" id="msg2">Spring ’27 · 3 CSE grad classes</div>
+     <div data-hf-id="hf-km7y" class="bubble out small" id="msg3">Into data, AI + systems</div>
+     <div data-hf-id="hf-3dh9" class="read" id="read1">Delivered</div>
+     <div data-hf-id="hf-opoj" class="typing" id="typing1"><span data-hf-id="hf-uckh"></span><span data-hf-id="hf-l73p"></span><span data-hf-id="hf-me0s"></span></div>
+     <div data-hf-id="hf-8qbo" class="bubble in" id="msg4">On it 💙</div>
+    </div></section>
+    <section data-hf-id="hf-rayq" class="pane" id="sources"><div data-hf-id="hf-2bee" class="pane-content">
+     <div data-hf-id="hf-eb3p" class="bubble out small" id="source-request">Find classes that fit me.</div>
+     <div data-hf-id="hf-gu9z" class="bubble in small" id="source-reply">ClassCue is on it 💙</div>
+     <div data-hf-id="hf-7ip4" class="source-list">
+      <div data-hf-id="hf-j5y6" class="source" id="src1"><div data-hf-id="hf-yvza" class="source-icon">A</div><div data-hf-id="hf-y7yw"><div data-hf-id="hf-ecnr" class="source-title">ASU class details</div><div data-hf-id="hf-but4" class="source-meta">Courses, sections + times</div></div><span data-hf-id="hf-5fzm" class="source-check">✓</span></div>
+      <div data-hf-id="hf-f7u5" class="source" id="src2"><div data-hf-id="hf-tywi" class="source-icon">★</div><div data-hf-id="hf-x11t"><div data-hf-id="hf-kq98" class="source-title">Professor insights</div><div data-hf-id="hf-m1as" class="source-meta">Rate My Professors reviews</div></div><span data-hf-id="hf-y6t2" class="source-check">✓</span></div>
+      <div data-hf-id="hf-c8kk" class="source" id="src3"><div data-hf-id="hf-pcqu" class="source-icon">♡</div><div data-hf-id="hf-xfcu"><div data-hf-id="hf-nf17" class="source-title">Your preferences</div><div data-hf-id="hf-fu4f" class="source-meta">Interests + schedule fit</div></div><span data-hf-id="hf-yl43" class="source-check">✓</span></div>
+     </div>
+     <div data-hf-id="hf-dbnd" class="source-note" id="source-note">Spring ’27 catalog snapshot. Current seats need checking.</div>
+    </div></section>
+    <section data-hf-id="hf-z3tg" class="pane courses" id="shortlist"><div data-hf-id="hf-2ppf" class="pane-content">
+     <div data-hf-id="hf-igqf" class="bubble in" id="shortlist-intro">Here’s a balanced shortlist 👇</div>
+     <div data-hf-id="hf-awrf" class="course" id="c511"><div data-hf-id="hf-i7y1" class="course-top"><span data-hf-id="hf-1ree" class="code">CSE 511</span><span data-hf-id="hf-diql" class="fit">DATA + SYSTEMS</span></div><div data-hf-id="hf-vr9w" class="course-title">Data Processing at Scale</div><div data-hf-id="hf-nawb" class="course-time">Wed / Fri · 1:30–2:45 PM</div></div>
+     <div data-hf-id="hf-oqma" class="course" id="c572"><div data-hf-id="hf-fp1p" class="course-top"><span data-hf-id="hf-311h" class="code">CSE 572</span><span data-hf-id="hf-91wy" class="fit">ANALYSIS + ML</span></div><div data-hf-id="hf-vydq" class="course-title">Data Mining</div><div data-hf-id="hf-mp37" class="course-time">Mon / Wed · 12:00–1:15 PM</div></div>
+     <div data-hf-id="hf-i927" class="course" id="c546"><div data-hf-id="hf-gvys" class="course-top"><span data-hf-id="hf-4gou" class="code">CSE 546</span><span data-hf-id="hf-qolp" class="fit">CLOUD SYSTEMS</span></div><div data-hf-id="hf-ffod" class="course-title">Cloud Computing</div><div data-hf-id="hf-1s1g" class="course-time">Mon / Wed · 3:00–4:15 PM</div></div>
+     <div data-hf-id="hf-aq3j" class="source-note" id="shortlist-note">Example planning picks. Verify current seats + eligibility with ASU.</div>
+    </div></section>
+    <section data-hf-id="hf-chz0" class="pane evidence" id="evidence"><div data-hf-id="hf-340g" class="pane-content">
+     <div data-hf-id="hf-n7u8" class="proof-pill" id="proof-label"><span data-hf-id="hf-z6sn" class="proof-dot"></span>FROM THE REAL CUBBIE CHAT</div>
+     <div data-hf-id="hf-1u2o" class="evidence-title" id="proof-title">Know the tradeoff.</div>
+     <div data-hf-id="hf-sif7" class="capture-window" id="proof-capture" data-layout-allow-overflow><img data-hf-id="hf-cj9f" src="assets/cubbie-evidence.png" alt="Actual Cubbie response showing CSE 546, Ming Zhao, and meeting times." data-layout-ignore></div>
+     <div data-hf-id="hf-1y9a" class="quote-card" id="proof-review"><div data-hf-id="hf-oj5a" class="label">STUDENT REVIEW THEMES · CSE 546</div><div data-hf-id="hf-4x14" class="quote-main">Useful projects.</div><div data-hf-id="hf-9fvw" class="quote-trade">Demanding workload and grading.</div></div>
+     <div data-hf-id="hf-r9h8" class="source-note" id="proof-note">Student opinions. Experiences vary.</div>
+    </div></section>
+    <section data-hf-id="hf-rmvi" class="pane alternative" id="alternative"><div data-hf-id="hf-0bv9" class="pane-content">
+     <div data-hf-id="hf-7wms" class="bubble out" id="ml-request">More machine learning?</div>
+     <div data-hf-id="hf-du6w" class="typing" id="typing2"><span data-hf-id="hf-lzpr"></span><span data-hf-id="hf-n6mu"></span><span data-hf-id="hf-msbt"></span></div>
+     <div data-hf-id="hf-dekp" class="bubble in small" id="ml-reply">Consider this instead 👇</div>
+     <div data-hf-id="hf-5ywl" class="course" id="c575"><div data-hf-id="hf-ghnr" class="course-top"><span data-hf-id="hf-5t6o" class="code">CSE 575</span><span data-hf-id="hf-56o8" class="fit">MORE ML</span></div><div data-hf-id="hf-ldyq" class="course-title">Statistical Machine Learning</div><div data-hf-id="hf-dk50" class="course-time">Mon / Wed · 9:00–10:15 AM</div></div>
+     <div data-hf-id="hf-izpq" class="swap" id="swap"><span data-hf-id="hf-9cnb">CSE 546</span><span data-hf-id="hf-v68i" class="arrow">→</span><span data-hf-id="hf-c3u9">CSE 575</span></div>
+     <div data-hf-id="hf-yi3a" class="source-note" id="ml-note">Verify prerequisites + degree fit.</div>
+    </div></section>
+    <section data-hf-id="hf-oe0a" class="pane end" id="end"><div data-hf-id="hf-0q6a" class="pane-content">
+     <div data-hf-id="hf-hwiv" class="end-avatar" id="end-avatar">c</div>
+     <div data-hf-id="hf-8kbh" class="end-logo" id="end-logo">ClassCue.</div>
+     <div data-hf-id="hf-rmon" class="end-sub" id="end-sub">A skill for Cubbie.</div>
+     <div data-hf-id="hf-9peb" class="end-title" id="end-title">Your next semester starts with a text.</div>
+     <div data-hf-id="hf-2m0r" class="cta" id="cta">Try it + vote for ClassCue</div>
+     <div data-hf-id="hf-lucu" class="end-link" id="end-link">Install + voting links in bio ↗</div>
+     <div data-hf-id="hf-vuew" class="end-note" id="end-note">ASU course planning. Verify seats and eligibility before registering.</div>
+    </div></section>
+   </div>
+   <div data-hf-id="hf-cydq" class="composer"><span data-hf-id="hf-var8" class="plus">⊕</span><div data-hf-id="hf-g4ov" class="compose-field"><span data-hf-id="hf-3enq" id="compose-copy">iMessage</span><span data-hf-id="hf-fwxv" class="cursor" id="cursor"></span><span data-hf-id="hf-6zfh" class="compose-send">↑</span></div></div>
+   <div data-hf-id="hf-78cx" class="home-indicator"></div>
+  </div>
+ </div>
+ <div data-hf-id="hf-k9la" class="caption-zone" id="captions"></div>
+ <div data-hf-id="hf-ynmz" class="demo-label">Demo · conversation condensed from an actual Cubbie chat</div>
+ <div data-hf-id="hf-31j5" class="progress"><div data-hf-id="hf-b9gd" class="progress-fill"></div></div>
+ <audio data-hf-id="hf-d2y6" id="audio-mix" src="assets/final-mix.wav" data-start="0" data-duration="28" data-track-index="2" data-volume="1"></audio>
+</div>
+<script src="captions.js"></script>
+<script>
+window.__timelines=window.__timelines||{};
+const tl=gsap.timeline({paused:true});
+const enter=(s,t,vars={})=>tl.from(s,{y:24,opacity:0,scale:.98,duration:.42,ease:'power3.out',...vars},t);
+// Crossfades act on the scene containers; child content remains present through handoffs.
+function crossfade(a,b,t,d=.36){tl.to(a,{opacity:0,duration:d,ease:'power2.inOut'},t);tl.fromTo(b,{opacity:0},{opacity:1,duration:d,ease:'power2.inOut'},t);}
+function typing(s,t,n){tl.from(s,{scale:.85,opacity:0,y:12,duration:.22,ease:'back.out(1.2)'},t);document.querySelectorAll(s+' span').forEach((e,i)=>tl.to(e,{y:-7,opacity:.48,duration:.25,yoyo:true,repeat:n,ease:'sine.inOut'},t+.15+i*.12));}
+function write(text,t,d){const e=document.getElementById('compose-copy');tl.set(e,{textContent:''},t);Array.from(text).forEach((c,i)=>tl.set(e,{textContent:Array.from(text).slice(0,i+1).join('')},t+d*(i+1)/Array.from(text).length));tl.set(e,{textContent:'iMessage'},t+d+.1);}
+enter('.brand',.1,{y:-10,scale:1,ease:'power2.out'});enter('#h1',.13,{y:28,ease:'expo.out'});enter('.phone',.25,{y:90,scale:.92,ease:'power3.out',duration:.7});
+tl.to('.glow',{scale:1.13,x:35,duration:14,yoyo:true,repeat:1,ease:'sine.inOut'},0);tl.to('.orbit',{rotation:18,scale:1.09,duration:28,ease:'sine.inOut'},0);
+tl.from('.progress-fill',{scaleX:0,duration:28,ease:'none'},0);
+write('help me pick classes',.6,.85);enter('#msg1',1.5,{x:20,y:28,ease:'back.out(1.12)'});
+write('Spring 2027 · CSE grad classes',3.02,.65);enter('#msg2',3.72,{x:28,y:20,ease:'power3.out'});
+write('data, AI + systems',3.86,.38);enter('#msg3',4.3,{x:20,y:25,ease:'expo.out'});enter('#read1',4.88,{y:0,duration:.2});
+typing('#typing1',4.92,1);tl.set('#typing1',{opacity:0},5.35);enter('#msg4',5.35,{x:-16,y:20,ease:'back.out(1.1)'});
+crossfade('#request','#sources',5.68);crossfade('#h1','#h2',5.68);
+enter('#source-request',5.83,{x:14,y:16});enter('#source-reply',6.01,{x:-15,ease:'back.out(1.1)'});
+enter('#src1',6.65,{x:-20,ease:'expo.out'});enter('#src2',8.38,{x:-24,ease:'power3.out'});enter('#src3',9.75,{y:26,ease:'back.out(1.1)'});enter('#source-note',6.85,{y:8,scale:1,duration:.28});
+crossfade('#sources','#shortlist',10.95);crossfade('#h2','#h3',10.95);
+enter('#shortlist-intro',11.1,{x:-15,y:18});enter('#c511',11.34,{x:-20,ease:'expo.out'});enter('#c572',11.88,{y:28,ease:'power3.out'});enter('#c546',12.46,{x:-14,ease:'back.out(1.08)'});enter('#shortlist-note',11.4,{y:8,scale:1});
+crossfade('#shortlist','#evidence',14.52,.38);
+enter('#proof-label',14.66,{y:12,scale:1,ease:'power2.out'});enter('#proof-title',14.8,{y:20,ease:'expo.out'});enter('#proof-capture',14.96,{y:16,scale:.97,ease:'power3.out'});enter('#proof-review',15.13,{y:24,ease:'back.out(1.05)'});enter('#proof-note',15.3,{y:10,scale:1});
+crossfade('#evidence','#alternative',16.67);crossfade('#h3','#h4',16.67);
+enter('#ml-request',16.76,{x:20,ease:'expo.out'});typing('#typing2',16.9,1);tl.set('#typing2',{opacity:0},17.4);enter('#ml-reply',17.4,{x:-18,ease:'back.out(1.1)'});enter('#c575',17.67,{y:30,ease:'power3.out'});enter('#swap',18.18,{x:-10,ease:'expo.out'});enter('#ml-note',17.9,{y:8,scale:1});
+crossfade('#alternative','#end',20.04,.45);crossfade('#h4','#h5',20.04,.45);
+enter('#end-avatar',20.2,{scale:.6,y:20,ease:'back.out(1.35)',duration:.55});enter('#end-logo',20.42,{y:24,ease:'expo.out'});enter('#end-sub',20.64,{y:14,ease:'power2.out'});enter('#end-title',21.13,{y:24,ease:'power3.out'});enter('#cta',22.35,{scale:.9,y:15,ease:'back.out(1.25)'});enter('#end-link',22.63,{y:12,scale:1});enter('#end-note',23.1,{y:8,scale:1});
+tl.to('.phone',{scale:1.018,duration:19,ease:'sine.inOut'},1);tl.to('.phone',{scale:.985,duration:1.1,ease:'power2.inOut'},20.1);
+tl.to('#cursor',{opacity:0,duration:.35,repeat:13,yoyo:true,ease:'none'},.1);
+CAPTIONS.forEach((g,i)=>{const e=document.createElement('div');e.className='caption';e.id='caption-'+i;const s=document.createElement('span');s.textContent=g.text;e.appendChild(s);document.getElementById('captions').appendChild(e);tl.fromTo(e,{opacity:0,y:8},{opacity:1,y:0,duration:.07,ease:'power2.out'},g.start);tl.to(e,{opacity:0,duration:.1,ease:'power1.in'},g.end-.1);tl.set(e,{opacity:0},g.end);});
+window.__timelines.main=tl;
+</script>
+</body>
+</html>

@@ -1,10 +1,13 @@
 import {clean,type PlanningSession} from '../domain/planning.js';
 import {semesterName} from '../domain/semester.js';
-import {reviewProfile} from './quality.js';
+import {reviewProfile,officialTopicReasons} from './quality.js';
 import type {Evidence} from '../research/types.js';
 import type {Candidate,GroupSchedule,Recommendation} from './types.js';
 
-const brief=(s:string)=>clean(s.replace(/https?:\/\/\S+/g,'').replace(/[\r\n\[\]]+/g,' ').replace(/\s+/g,' ').slice(0,160));
+const brief=(s:string)=>{
+  const text=s.replace(/https?:\/\/\S+/g,'').replace(/[\r\n\[\]]+/g,' ').replace(/\s+/g,' ').trim();
+  return clean(text.length>160?text.slice(0,157).replace(/\s+\S*$/,'')+'…':text);
+};
 export function meetings(candidate:Candidate){
   const time=(s:string)=>{const [h,m]=s.split(':').map(Number);return `${h!%12||12}${m?':'+String(m).padStart(2,'0'):''} ${h!>=12?'PM':'AM'}`;};
   return candidate.components.flatMap(s=>s.meeting_intervals.filter(m=>m.status==='scheduled'&&m.start&&m.end).map(m=>`${m.days.map(d=>d.slice(0,1)+d.slice(1).toLowerCase()).join('/')} ${time(m.start!)}–${time(m.end!)}`)).join('; ')||'Meeting times unknown';
@@ -25,6 +28,8 @@ export function renderPlan(session:PlanningSession,schedule:GroupSchedule,ranked
   for(const s of schedule.students){
     const person=session.participants[s.userId]!,marker=inlineMentions.find(m=>m.userId===s.userId)!.marker;
     text+=`\n${marker} — **${s.candidates.length}/${s.requested} course${s.requested===1?'':'s'} suggested**${s.countKnown?'':' (course count unconfirmed)'}\n`;
+    const priorities=Object.values(person.profile.facts).filter(f=>f?.strength==='soft').flatMap(f=>f!.values);
+    if(priorities.length)text+=`• Your preferences: ${brief(priorities.join('; '))}.\n`;
     if(!s.candidates.length){
       const reasons=ranked.flatMap(c=>c.fits.filter(f=>f.userId===s.userId).flatMap(f=>f.conflicts));
       text+=reasons.length?`• No safe choice in this search: ${brief([...new Set(reasons)].slice(0,2).join('; '))}.\n`:'• No time-checked choice yet; availability or meeting information is incomplete.\n';
@@ -34,19 +39,27 @@ export function renderPlan(session:PlanningSession,schedule:GroupSchedule,ranked
     for(const c of s.candidates){
       const own=c.fits.find(f=>f.userId===s.userId)!;
       text+=`• **${c.section.subject} ${c.section.catalog_nbr} · ${c.section.class_nbr}** — ${meetings(c)}\n`;
-      const why=own.softEvidence.filter(n=>!n.startsWith('Time preference:')&&!n.startsWith('Time tradeoff:')&&!n.startsWith('Review tradeoff:')&&!n.startsWith('Evidence tradeoff:')).slice(0,1);
-      if(why.length)text+=`  Why: ${brief(why.join('; '))}\n`;
+      const why=[...officialTopicReasons(person,c),...own.softEvidence.filter(n=>!n.startsWith('Time preference:')&&!n.startsWith('Time tradeoff:')&&!n.startsWith('Review tradeoff:')&&!n.startsWith('Evidence tradeoff:'))].slice(0,2);
+      text+=`  Why: fits your known attendance limits${why.length?'; '+brief(why.join('; ')):''}.`;
+      if(!why.length)text+=' Interest/workload fit is not yet established from analyzed evidence.';
+      text+='\n';
       const tradeoffs=own.softEvidence.filter(n=>n.startsWith('Time tradeoff:')||n.startsWith('Review tradeoff:')||n.startsWith('Evidence tradeoff:'));
-      if(tradeoffs.length)text+=`  Heads-up: ${brief(tradeoffs.join('; '))}\n`;
+      for(const tradeoff of tradeoffs.slice(0,2))text+=`  Heads-up: ${brief(tradeoff)}\n`;
     }
     if(s.candidates.some(c=>c.fits.find(f=>f.userId===s.userId)!.softEvidence.some(n=>n.startsWith('Review tradeoff:'))))text+='• These fill schedule needs with workload tradeoffs; an easy option is not verified.\n';
     if(s.candidates.length<s.requested)text+=`• Still need ${s.requested-s.candidates.length} more; hard constraints were kept.\n`;
   }
   text+='\n**Overall recommendation**\n';
   const selected=[...new Map(schedule.students.flatMap(s=>s.candidates).map(c=>[c.section.class_nbr,c])).values()];
-  const shared=selected.filter(c=>schedule.students.filter(s=>s.candidates.includes(c)).length>1);
-  if(shared.length)text+=`Shared ${shared.some(c=>!c.bundleVerified)?'preliminary ':''}option: ${shared.map(c=>`${c.section.subject} ${c.section.catalog_nbr} (${schedule.students.filter(s=>s.candidates.includes(c)).map(s=>clean(session.participants[s.userId]!.name)).join(' + ')})`).join('; ')} together. Other choices fill individual needs.\n`;
-  else text+='No single returned option works for everyone; individual alternatives are shown where possible.\n';
+  const users=(c:Candidate)=>schedule.students.filter(s=>s.candidates.includes(c));
+  const shared=selected.filter(c=>users(c).length>1).sort((a,b)=>users(b).length-users(a).length
+    ||users(b).reduce((n,s)=>n+b.fits.find(f=>f.userId===s.userId)!.softScore,0)-users(a).reduce((n,s)=>n+a.fits.find(f=>f.userId===s.userId)!.softScore,0));
+  if(shared.length){
+    const best=shared[0]!,everyone=users(best).length===schedule.students.length;
+    text+=`${everyone?'Best common course in this plan':'Best partial-group course in this plan'}${best.bundleVerified?'':' (preliminary)'}: **${best.section.subject} ${best.section.catalog_nbr} · ${best.section.class_nbr}**, for ${users(best).map(s=>clean(session.participants[s.userId]!.name)).join(' + ')}. `;
+    text+=everyone?'It meets everyone’s known attendance limits. Preference matches, tradeoffs and unverified fit are listed for each student above.\n':'No course was selected for everyone; other students’ alternatives and gaps are listed above.\n';
+    if(shared.length>1)text+=`Other shared options: ${shared.slice(1).map(c=>`${c.section.subject} ${c.section.catalog_nbr} (${users(c).map(s=>clean(session.participants[s.userId]!.name)).join(' + ')})`).join('; ')}.\n`;
+  }else text+='No common section was selected in this bounded plan; individual alternatives are shown where possible.\n';
   selected.slice(0,6).forEach((c,index)=>{
     const s=c.section;
     text+=`\n**Option ${index+1}: ${s.subject} ${s.catalog_nbr} — ${brief(s.title)}**\n${brief(s.instructors.map(i=>i.name).join(', ')||'Instructor unknown')} · ${s.open_seats===null?'seats unknown':`${s.open_seats} seats observed`}\n`;

@@ -7,7 +7,9 @@ export class PlanningCatalogClient implements PlanningCatalog{
   constructor(private api:APIClient,private scheduler:ResearchScheduler){}
   async search(q:PlanningQuery,signal:AbortSignal):Promise<CatalogResult>{
     const prefix=Boolean(q.catalog&&/^\d{1,2}$/.test(q.catalog));
-    const key=q.subject&&q.catalog?`catalog:${q.term}:${q.subject}:${q.catalog}${q.delivery==='O'?':O':''}`:`planning-keyword:${q.term}:${q.keyword}:${q.delivery??'A'}`;
+    // Include every search dimension: concurrent subject-only and keyword searches
+    // must not share a pending result (or reuse another subject's cached sections).
+    const key='planning-catalog:'+JSON.stringify([q.term,q.subject??'',q.catalog??'',q.keyword??'',q.delivery??'A']);
     const result=await this.scheduler.cached(key,120000,false,'asu',signal,()=>this.api.get('/api/search',catalogSchema,
       // ASU's catalogNbr is exact in live searches. Retrieve the level, then enforce the family locally.
       {term:q.term,subject:q.subject??'',catalog_nbr:prefix?'':q.catalog??'',level:prefix?(Number(q.catalog![0])>=5?'grad':'undergrad'):'',keyword:q.keyword??'',search_type:'all',max_pages:'2',campus_or_online_selection:q.delivery??'A'},signal));

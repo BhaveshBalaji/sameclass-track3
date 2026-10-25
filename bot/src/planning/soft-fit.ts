@@ -7,6 +7,7 @@ import {ResearchScheduler} from '../research/scheduler.js';
 import {syllabusView} from '../research/syllabus-view.js';
 import type {Candidate,SoftFitAssessor} from './types.js';
 import type {Evidence} from '../research/types.js';
+import {officialTopicReasons} from './quality.js';
 
 export function evidenceText(e:Evidence):string{
   if(e.kind==='syllabus')return JSON.stringify(syllabusView(e.data,'workload assignment project exam grading strict policy topics AI ML NLP theory',7500));
@@ -51,6 +52,9 @@ export class ModelSoftFit implements SoftFitAssessor{
     for(const a of result.output.assessments){
       const found=source(a.sectionId,a.evidenceId,a.quote),owner=session.participants[a.userId];
       if(!found||!safeNote(a.note)||!owner?.active||owner.profile.facts[a.factKey]?.strength!=='soft')continue;
+      // Official topic support is already scored deterministically; do not reward
+      // the same interest again because the model paraphrased that evidence.
+      if(a.fit==='supports'&&/topic|interest|subject/.test(a.factKey)&&officialTopicReasons(owner,found.scoped.candidate).length)continue;
       const wantsLightWork=/easy|easier|simpl|lighter|light workload|low workload/i.test(owner.profile.facts[a.factKey]!.values.join(' '));
       if(wantsLightWork&&a.fit==='supports'&&!/easy|easier|manageable|light workload|low workload|not much work/i.test(a.quote))continue;
       const key=`${a.sectionId}:${a.userId}:${a.factKey}`;if(seen.has(key))continue;seen.add(key);

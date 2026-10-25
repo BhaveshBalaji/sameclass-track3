@@ -55,7 +55,7 @@ test('no shared match preserves conflicts and produces useful individual alterna
   const sections=[section('511','90003',['MON'],'09:00','10:00'),section('575','90004',['THU'],'19:00','20:00')];
   const engine=new GroupPlanningEngine({async project(){return projection;}},{async search(){return {count:2,total:2,results:sections,pages_fetched:1,complete:true,stop_reason:'exhausted',retrieved_at:'2026-10-25T02:00:00Z'};}},undefined);
   const result=await engine.recommend(base,'Find courses together',AbortSignal.timeout(1000));
-  assert.match(result.text,/No single returned option/);assert.match(result.text,/alternative/);assert.doesNotMatch(result.text,/guaranteed|verified backup/);
+  assert.match(result.text,/No common section was selected/);assert.match(result.text,/alternative/);assert.doesNotMatch(result.text,/guaranteed|verified backup/);
 });
 test('one failed catalog sibling does not erase a successful candidate and custom hard facts stay unchecked',async()=>{
   const custom=structuredClone(base);custom.participants['test:maya']!.profile.facts.accessibility={field:'accessibility',strength:'hard',values:['Step-free classrooms'],sources:[{messageId:'test:m01',quote:'Synthetic source'}]};
