@@ -1,13 +1,15 @@
 import { z } from 'zod';
 
 export const taskSchema=z.object({
-  kind:z.enum(['catalog','details','syllabus','reviews']),subject:z.string().regex(/^[A-Z]{2,5}$/),
-  catalog:z.string().regex(/^\d{3}[A-Z]?$/),semester:z.string().max(40),
+  kind:z.enum(['catalog','details','syllabus','reviews']),subject:z.union([z.string().regex(/^[A-Z]{2,5}$/),z.literal('')]),
+  catalog:z.union([z.string().regex(/^\d{3}[A-Z]?$/),z.literal('')]),semester:z.string().max(40),
   professor:z.string().min(2).max(100).nullable(),classNumber:z.string().regex(/^\d+$/).nullable(),
 });
 export type ResearchTask=z.infer<typeof taskSchema>;
-export const planSchema=z.object({tasks:z.array(taskSchema).max(12),clarification:z.string().max(500).nullable(),refresh:z.boolean()});
+export const planSchema=z.object({tasks:z.array(taskSchema).max(12),clarification:z.string().max(500).nullable(),refresh:z.boolean(),directAnswer:z.string().max(1500).nullable().default(null)});
 export type ResearchPlan=z.infer<typeof planSchema>;
+export interface ResearchTurn {requestId:string;userId?:string;question:string;answer:string;tasks:ResearchTask[];instructors:string[];sources?:string[]}
+export interface ResearchContext {turns:ResearchTurn[];result?:{tasks:ResearchTask[];instructors:string[];sources?:string[]}}
 export interface Evidence {
   id:string;kind:string;entity:string;status:'ok'|'partial'|'unavailable'|'ambiguous';
   retrievedAt:string;retrievedAtLocal:string;sources:string[];data:unknown;limitations:string[];

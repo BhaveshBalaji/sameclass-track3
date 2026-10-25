@@ -1,8 +1,9 @@
 import { clean } from '../domain/planning.js';
 import { semesterCode, semesterName } from '../domain/semester.js';
 import type { CatalogQuery, CatalogResult, CatalogSource } from '../integrations/catalog.js';
+import type { ResearchContext } from '../research/types.js';
 
-export interface CourseResearch { answer(question:string,activeTerm?:string):Promise<string> }
+export interface CourseResearch { answer(question:string,activeTerm?:string,context?:ResearchContext):Promise<string> }
 type CatalogField = 'instructors' | 'seats' | 'meetings';
 const allFields: CatalogField[] = ['instructors','seats','meetings'];
 export function catalogFields(question:string):CatalogField[] {

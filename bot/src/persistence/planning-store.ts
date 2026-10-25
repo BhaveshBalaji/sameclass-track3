@@ -1,3 +1,4 @@
+import { ResearchMemory } from './research-context.js';
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import type { Outgoing, PlanningSession, Room } from '../domain/planning.js';
@@ -101,6 +102,7 @@ export class PlanningStore {
         const parts = messageParts(body.text);
         for (const [part, content] of parts.entries()) {
           const externalId = await send(body,part,content); messageIds.push(externalId);
+          if(body.requestId)await new ResearchMemory(this.pool,this.namespace).delivered(room,body.requestId,externalId);
           await this.pool.query('UPDATE ray_app.planning_outbox SET deliveries=$2 WHERE id=$1', [id,JSON.stringify(messageIds)]);
           await this.transact(room,`delivery:${id}:${part}`,async tx => {
             if (tx.state) for (const q of tx.state.clarifications) if (body!.clarificationIds.includes(q.id)) q.messageIds.push(externalId);

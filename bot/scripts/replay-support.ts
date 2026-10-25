@@ -34,6 +34,8 @@ export async function testDatabase(): Promise<pg.Pool> {
   await migrate(pool); return pool;
 }
 export async function cleanup(pool: pg.Pool, namespace: string) {
+  await pool.query('DELETE FROM ray_app.research_context WHERE namespace=$1',[namespace]);
+  await pool.query('DELETE FROM ray_app.research_replies WHERE namespace=$1',[namespace]);
   await pool.query('DELETE FROM ray_app.planning_rooms WHERE namespace=$1',[namespace]);
   const checkpoints = await pool.query('SELECT DISTINCT thread_id FROM ray_checkpoints.checkpoints WHERE thread_id LIKE $1',[`m1:${namespace}:%`]);
   for (const row of checkpoints.rows) await createCheckpointer(pool).deleteThread(row.thread_id);

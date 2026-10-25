@@ -88,12 +88,13 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
     const room = { guildId: message.guildId!, channelId: message.channelId };
     const current = await app.store.read(room);
     const direct = current?.clarifications.some(q => q.state === 'pending' && q.userId === message.author.id && q.messageIds.includes(message.reference?.messageId ?? ''));
-    if (mentioned || direct) {
+    const researchReply=message.reference?.messageId?Boolean(await app.memory.referenced(room,message.reference.messageId)):false;
+    if (mentioned || direct || researchReply) {
       await message.channel.sendTyping().catch(() => {});
     }
     await app.message({ ...room, id: message.id, userId: message.author.id, name: message.member?.displayName ?? message.author.displayName,
       content: message.content, botMention: mentioned, replyTo: message.reference?.messageId });
-    if (mentioned || direct) await deliver(room);
+    if (mentioned || direct || researchReply) await deliver(room);
   }
   client.on(Events.InteractionCreate,interaction => { void onInteraction(interaction).catch(() => console.error(JSON.stringify({ event: 'interaction_failed', id: interaction.id }))); });
   client.on(Events.MessageCreate,message => { void onMessage(message).catch(() => console.error(JSON.stringify({ event: 'message_failed', id: message.id }))); });

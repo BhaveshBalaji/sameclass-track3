@@ -83,7 +83,7 @@ test('professor identity requires correct school/department; review pages preser
   await assert.rejects(source.reviewPage(task,good,'next',b,b.signal));
   assert.equal((first.data as {reviews:unknown[]}).reviews.length,1);
 });
-test('real graph/SDK tool loop synthesizes a question-specific answer from validated evidence',async()=>{
+test('real graph dispatch synthesizes a question-specific answer from validated evidence',async()=>{
   const f=await fixtures(),config=parseConfig({OPENROUTER_API_KEY:'synthetic-key'}),scheduler=new ResearchScheduler();
   let sourceCalls=0,diagnostic:ResearchDiagnostics|undefined;
   const source=new ResearchSources(new APIClient('https://asu.test',1000,async()=>{sourceCalls++;return Response.json(f.catalog);}),new APIClient('https://rmp.test',1000),scheduler);
@@ -101,6 +101,6 @@ test('real graph/SDK tool loop synthesizes a question-specific answer from valid
   };
   const agent=new ResearchAgent(config,source,scheduler,undefined,data=>{diagnostic=data;},transport);
   const answer=await agent.answer('Who teaches CSE 575 in Spring 2027?');
-  assert.match(answer,/Example Instructor/);assert.match(answer,/Source 1/);assert.equal(sourceCalls,1);
-  assert.equal(diagnostic?.modelCalls,3);assert.doesNotMatch(answer,/Seats:|Meeting times/);
+  assert.match(answer,/Example Instructor/);assert.match(answer,/Class Link/);assert.equal(sourceCalls,1);
+  assert.equal(diagnostic?.modelCalls,2);assert.doesNotMatch(answer,/Seats:|Meeting times/);
 });

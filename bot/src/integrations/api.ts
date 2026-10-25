@@ -9,6 +9,12 @@ export class APIError extends Error {
 /** Base paths survive deployment under /asu or /rmp; no hostname belongs in workflow code. */
 export class APIClient {
   constructor(private baseUrl: string, private timeoutMs: number, private request: typeof fetch = fetch) {}
+  endpoint(path:string,params:Record<string,string>={}):string {
+    if(!path.startsWith('/')||path.includes('..')||path.includes('://'))throw new Error('Expected a relative API path.');
+    const url=new URL(`${this.baseUrl.replace(/\/+$/,'')}${path}`);
+    for(const [key,value] of Object.entries(params))url.searchParams.set(key,value);
+    return url.toString();
+  }
   async get<T>(path: string, responseSchema: z.ZodType<T>, params: Record<string, string> = {}, signal?: AbortSignal): Promise<T> {
     if (!path.startsWith('/') || path.includes('..') || path.includes('://')) throw new Error('Expected a relative API path.');
     const url = new URL(`${this.baseUrl.replace(/\/+$/, '')}${path}`);

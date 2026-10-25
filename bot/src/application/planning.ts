@@ -1,3 +1,5 @@
+import { ResearchMemory } from '../persistence/research-context.js';
+import type { ResearchContext } from '../research/types.js';
 import { semesterCode, semesterName } from '../domain/semester.js';
 import { isCourseQuestion, type CourseResearch } from './catalog.js';
 import { randomUUID } from 'node:crypto';
@@ -29,6 +31,7 @@ export class PlanningApplication {
   constructor(readonly store: PlanningStore, private language: LanguageService,
     private limits = { messages: 100, characters: 30000, participants: 12 },
     private research?: CourseResearch) {}
+  get memory(){return new ResearchMemory(this.store.pool,this.store.namespace);}
   async start(room: Room, eventId: string, actor: Actor, term: string): Promise<void> {
     term = semesterCode(term);
     await this.store.transact(room,eventId,async tx => {
@@ -85,6 +88,7 @@ export class PlanningApplication {
       await this.store.eraseResponses(tx,state.id);
       await tx.enqueue(response('Your stored profile and retained source messages have been reset.',[actor.userId]));
     });
+    await this.memory.clear(room,actor.userId);
   }
   async requestReset(room: Room, eventId: string, actor: Actor): Promise<void> {
     await this.store.transact(room,eventId,async tx => {
@@ -104,26 +108,32 @@ export class PlanningApplication {
       await this.store.eraseResponses(tx,state.id); tx.state = null;
       await tx.enqueue(response('Session reset. Use /plan start to begin a new session.'));
     });
+    await this.memory.clear(room);
   }
-  async ask(room: Room, eventId: string, actor: Actor, question: string, replyTo?:string): Promise<void> {
+  async ask(room: Room, eventId: string, actor: Actor, question: string, replyTo?:string, contextReplyTo?:string): Promise<void> {
     const claimed = await this.store.transact(room,eventId,async tx => ({ term:tx.state?.term }));
     if (claimed.duplicate) return;
-    const text = await this.answerCourse(question,claimed.value?.term);
+    const prior=await this.memory.begin(room,actor.userId,contextReplyTo);
+    const context:ResearchContext={turns:prior.turns};
+    const text = await this.answerCourse(question,claimed.value?.term,context);
+    await this.memory.finish(room,actor.userId,prior.version,prior.turns,{requestId:eventId,question:question.slice(0,2000),answer:text.slice(0,4000),
+      tasks:context.result?.tasks??[],instructors:context.result?.instructors??[],sources:context.result?.sources??[]});
     await this.store.transact(room,`answer:${eventId}`,async tx => {
       await tx.enqueue({...response(text,[actor.userId]),requestId:eventId,replyTo});
     });
   }
-  private answerCourse(question:string,term?:string):Promise<string> {
-    return this.research ? this.research.answer(question,term)
+  private answerCourse(question:string,term?:string,context?:ResearchContext):Promise<string> {
+    return this.research ? this.research.answer(question,term,context)
       : Promise.resolve('Course research is not connected in this test environment.');
   }
   async message(event: Incoming): Promise<void> {
     if (event.bot || event.webhook) return;
-    if (event.botMention) {
+    if (event.botMention || event.replyTo) {
       const session = await this.store.read(event);
       const direct = session?.clarifications.some(q => q.state === 'pending' && q.userId === event.userId && q.messageIds.includes(event.replyTo ?? ''));
-      if (!direct && (isCourseQuestion(event.content) || !session)) {
-        await this.ask(event,event.id,event,event.content,event.id); return;
+      const researchReply=event.replyTo?await this.memory.referenced(event,event.replyTo):null;
+      if (!direct && (researchReply || (event.botMention && (isCourseQuestion(event.content) || !session)))) {
+        await this.ask(event,event.id,event,event.content,event.id,event.replyTo); return;
       }
     }
     const claimed = await this.store.transact(event,event.id,async tx => {
