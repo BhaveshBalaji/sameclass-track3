@@ -118,11 +118,22 @@ export class ResearchSources {
     if(!name||(task.subject&&task.catalog&&!names.some(n=>normalizedName(n)===normalizedName(name))))throw new ResearchLimit(`Choose an instructor listed for this course: ${names.join(', ')||'none found'}.`);
     const key=`professor:15723:${normalizedName(name)}:${task.subject}`;
     const result=await this.read(key,'rmp',this.evidenceTtl,budget,signal,async()=>{
-      const found=await this.rmp.get('/api/professors',professors,{school_id:'15723',q:name,limit:'20',fallback:'false'},signal);
-      if(found.didFallback)throw new APIError('invalid_response');
-      const candidates=found.professors.filter(p=>normalizedName(`${p.firstName} ${p.lastName}`)===normalizedName(name));
-      if(candidates.length!==1)return {status:'ambiguous' as const,candidates,hasMore:found.pageInfo.hasNextPage,retrieved_at:found.retrieved_at};
-      if(found.pageInfo.hasNextPage)return {status:'ambiguous' as const,candidates,hasMore:true,retrieved_at:found.retrieved_at};
+      const foundRows=new Map<string,z.infer<typeof professor>>();
+      let cursor='',complete=false,retrieved='';
+      const seen=new Set<string>();
+      for(let page=0;page<3;page++){
+        if(seen.has(cursor))break;seen.add(cursor);
+        if(page&&++budget.tools>budget.maxTools)throw new ResearchLimit('Research request limit reached during professor identity search.');
+        const found=await this.rmp.get('/api/professors',professors,{school_id:'15723',q:name,limit:'100',cursor,fallback:'false'},signal);
+        if(found.didFallback)throw new APIError('invalid_response');
+        retrieved=found.retrieved_at;
+        for(const row of found.professors)foundRows.set(row.id,row);
+        if(!found.pageInfo.hasNextPage){complete=true;break;}
+        if(!found.pageInfo.endCursor)break;
+        cursor=found.pageInfo.endCursor;
+      }
+      const candidates=[...foundRows.values()].filter(p=>normalizedName(`${p.firstName} ${p.lastName}`)===normalizedName(name));
+      if(candidates.length!==1||!complete)return {status:'ambiguous' as const,reason:!complete?'search_incomplete':candidates.length===0?'no_exact_match':'duplicate_exact_matches',candidates,hasMore:!complete,retrieved_at:retrieved};
       if(++budget.tools>budget.maxTools)throw new ResearchLimit('Research request limit reached before professor identity confirmation.');
       const selected=await this.rmp.get(`/api/professors/${encodeURIComponent(candidates[0]!.id)}`,professor,{},signal);
       const school=selected.school?.id;
@@ -130,13 +141,13 @@ export class ResearchSources {
       const computerSubjects=['CSE','CS','CIS','IFT','SER'];
       const departmentKnown=Boolean(selected.department)&&(!task.subject?true:computerSubjects.includes(task.subject)?/computer|computing|software|information/i.test(selected.department!):false);
       if(selected.id!==candidates[0]!.id||selected.legacyId!==candidates[0]!.legacyId||Buffer.from(selected.id,'base64').toString()!==`Teacher-${selected.legacyId}`||normalizedName(`${selected.firstName} ${selected.lastName}`)!==normalizedName(name)||!correctSchool||!departmentKnown)
-        return {status:'ambiguous' as const,candidates:[selected],hasMore:false,retrieved_at:selected.retrieved_at??found.retrieved_at};
-      return {status:'ok' as const,professor:selected,retrieved_at:selected.retrieved_at??found.retrieved_at};
+        return {status:'ambiguous' as const,reason:'school_or_department_mismatch',candidates:[selected],hasMore:false,retrieved_at:selected.retrieved_at??retrieved};
+      return {status:'ok' as const,professor:selected,retrieved_at:selected.retrieved_at??retrieved};
     });
     const data=result.value;
     const urls=data.status==='ok'?[`https://www.ratemyprofessors.com/professor/${data.professor.legacyId}`]:[];
     return this.evidence(key,'professor_identity',task,data,data.retrieved_at,urls,{reused:result.reused,ageMs:result.ageMs},
-      data.status==='ok'?['RMP ratings are student opinions; aggregate ratings may cover other courses.']:['Name, ASU school and department could not uniquely confirm this professor; reviews cannot be attributed.'],data.status);
+      data.status==='ok'?['RMP ratings are student opinions; aggregate ratings may cover other courses.']:[data.reason==='no_exact_match'?'No exact full-name profile was returned by the ASU RMP search.':data.reason==='search_incomplete'?'The RMP name search is incomplete; identity remains unverified.':data.reason==='duplicate_exact_matches'?'Multiple exact-name profiles need disambiguation.':'The matching name did not pass school or department checks.'],data.status);
   }
   async reviewPage(task:ResearchTask,identity:Evidence,cursor:string,budget:ResearchBudget,signal:AbortSignal):Promise<Evidence>{
     const confirmed=identity.data as {status:string;professor?:z.infer<typeof professor>};

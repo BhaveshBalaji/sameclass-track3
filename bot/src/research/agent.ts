@@ -23,6 +23,8 @@ export class ResearchAgent implements CourseResearch {
     const id=randomUUID(),started=Date.now(),observations:ModelObservation[]=[];
     const signal=AbortSignal.timeout(this.config.RESEARCH_TOTAL_TIMEOUT_MS);
     const budget:ResearchBudget={signal,tools:0,models:0,maxTools:this.config.RESEARCH_MAX_SOURCE_CALLS,maxModels:this.config.RESEARCH_MAX_MODEL_CALLS,refresh:false};
+    let rounds=0,continueResearch=false;
+    const attempted=new Set<string>(),completedTasks:ResearchTask[]=[];
     let phase='plan',inputTokens=0,outputTokens=0,plan:ResearchPlan={tasks:[],clarification:null,refresh:false,directAnswer:null},workers:WorkerResult[]=[],answer='';
     const request:typeof fetch=async(input,init)=>{
       if(String(init?.body).length>this.config.RESEARCH_MAX_INPUT_CHARS)throw new ResearchLimit('Model input budget reached; some evidence could not be summarized.');
@@ -44,14 +46,14 @@ export class ResearchAgent implements CourseResearch {
           output:Output.object({schema:planSchema}),system:safety
           +'You are a task router, not an answering assistant. You have no catalog knowledge until tools run. Never reject a future semester or claim an offering/instructor is unavailable. Plan the requested lookups so the workers can verify them. An explicit semester in the question needs no active session. Plan only the work needed to answer the question. Tasks: catalog=instructors/sections/seats/meetings; details=course description/prerequisite text; '
           +'syllabus=assignments/exams/grading from syllabus; reviews=RMP student opinions/ratings about a listed instructor. '
-          +'For a professor-only question request just catalog, never reviews. For syllabus plus reviews request those independent tasks, not unrelated research. '
+          +'For a question asking only WHO teaches a course, request catalog. When reviews, ratings, difficulty or a recommendation are requested, request reviews as well. Do not downgrade a review request to a catalog-only answer. For syllabus plus reviews request those independent tasks, not unrelated research. '
           +'Resolve follow-ups such as "these professors", "which is best", "that syllabus" from the provided conversation and known catalog instructors. Do not ask again for known course/semester. '
           +'For a comparison or a best-professor question, create separate review tasks for ALL relevant known instructors; they execute concurrently. Do not stall by asking for preferences first: use course-specific review evidence for a provisional recommendation and state its basis briefly. Preferences can refine it afterward. Never claim a universal best professor. '
           +'A request for a syllabus document/link should reuse a known document link or dispatch syllabus research, not return a catalog link instead. '
           +'General advice, greetings, bot-capability questions and conversational acknowledgements need no course or semester: return directAnswer with tasks:[]. '
           +'Professor-only RMP questions need a name but not a course/semester: use empty strings for subject/catalog/semester when unavailable. Catalog and syllabus tasks do need a course and term. '
           +'Reuse conversation context first, then the active semester if omitted. Ask a short clarification only for identifiers truly missing from both. '
-          +'An instructor name may be null: workers resolve it from exact catalog evidence or report ambiguity. Class number may be null. '
+          +'An instructor name may be null: workers discover ALL listed instructors for that course and research them in parallel. Never ask the user to name an instructor when the catalog can supply them. Ask at most one short question for information that genuinely cannot be inferred. Class number may be null. '
           +'Use uppercase course subjects and numbers; semester as Spring/Summer/Fall YYYY. Set refresh true if the user asks for fresh/current/latest data. '
           +'Do not implement group schedule recommendations; explain that compatibility checking is not available yet.',
           prompt:JSON.stringify({question:question.slice(0,4000),conversation:context.turns.map(t=>({question:t.question,answer:t.answer.replace(/https?:\/\/[^\s)]+/g,'[source]').slice(0,2000),tasks:t.tasks,instructors:t.instructors})),activeSemester:activeTerm?semesterName(activeTerm):null})});
@@ -63,6 +65,7 @@ export class ResearchAgent implements CourseResearch {
           const base=prior?.tasks.find(k=>k.subject&&k.catalog&&k.semester);
           if(prior&&base){plan.tasks=prior.instructors.slice(0,this.config.RESEARCH_MAX_TASKS).map(professor=>({...base,kind:'reviews',professor,classNumber:null}));plan.clarification=null;plan.directAnswer=null;}
         }
+        this.ensureReviewGoal(plan,question,activeTerm,context);
         this.validatePlan(plan,question,activeTerm,context);
         budget.refresh=plan.refresh;
         return {status:'planned'};
@@ -70,7 +73,21 @@ export class ResearchAgent implements CourseResearch {
       .addNode('research',async()=>{
         phase='workers';
         if(plan.clarification||!plan.tasks.length)return {status:'clarification'};
-        const unique=[...new Map(plan.tasks.map(t=>[JSON.stringify(t),t])).values()];
+        rounds++;
+        const pending=plan.tasks.filter(t=>!attempted.has(JSON.stringify(t)));
+        const expanded=await Promise.all(pending.map(async task=>{
+          if(task.kind!=='reviews'||task.professor||!task.subject||!task.catalog||!task.semester)return [task];
+          attempted.add(JSON.stringify(task));
+          try{
+            const catalog=await this.sources.search(task,budget,signal);
+            workers.push({taskId:`${id}:discover:${task.catalog}`,entity:catalog.entity,status:catalog.status==='ok'?'ok':'partial',evidence:[catalog],limitations:[]});
+            const names=[...new Set((catalog.data as {results:{instructors:{name:string}[]}[]}).results.flatMap(s=>s.instructors.map(i=>i.name.trim())).filter(Boolean))];
+            return names.length?names.map(professor=>({...task,professor})):[];
+          }catch(error){workers.push({taskId:`${id}:discover:${task.catalog}`,entity:task.catalog,status:'unavailable',evidence:[],limitations:[safeResearchError(error)]});return [];}
+        }));
+        const unique=[...new Map(expanded.flat().map(t=>[JSON.stringify(t),t])).values()]
+          .filter(t=>!attempted.has(JSON.stringify(t))).slice(0,Math.max(0,this.config.RESEARCH_MAX_TASKS-completedTasks.length));
+        for(const task of unique){attempted.add(JSON.stringify(task));completedTasks.push(task);}
         const settled=await Promise.allSettled(unique.map(async(task,index)=>{
           const evidence:Evidence[]=[],limitations:string[]=[],taskId=`${id}:${index}`;
           const workerSignal=AbortSignal.any([signal,AbortSignal.timeout(this.config.RESEARCH_WORKER_TIMEOUT_MS)]);
@@ -84,8 +101,36 @@ export class ResearchAgent implements CourseResearch {
           }catch(error){limitations.push(safeResearchError(error));}
           return {taskId,reviewCoverage,entity:`${task.subject} ${task.catalog} / ${task.semester}`,status:!evidence.length?'unavailable':limitations.length||evidence.some(e=>e.status!=='ok')?'partial':'ok',evidence,limitations} satisfies WorkerResult;
         }));
-        workers=settled.map((result,index)=>result.status==='fulfilled'?result.value:{taskId:`${id}:${index}`,entity:unique[index]!.kind,status:'unavailable',evidence:[],limitations:[safeResearchError(result.reason)]});
+        workers.push(...settled.map((result,index)=>result.status==='fulfilled'?result.value:{taskId:`${id}:${index}`,entity:unique[index]!.kind,status:'unavailable' as const,evidence:[],limitations:[safeResearchError(result.reason)]}));
         return {status:'researched'};
+      })
+      .addNode('assess',async()=>{
+        continueResearch=false;
+        if(rounds!==1||!workers.length||budget.signal.aborted||budget.models>=budget.maxModels-1)return {status:'ready'};
+        phase='assess';
+        const evidence=[...new Map(workers.flatMap(w=>w.evidence).map(e=>[e.id,e])).values()];
+        const names=[...new Set(evidence.filter(e=>e.kind==='catalog').flatMap(e=>(e.data as {results:{instructors:{name:string}[]}[]}).results.flatMap(s=>s.instructors.map(i=>i.name))))];
+        const extraContext:ResearchContext={turns:[...context.turns,{requestId:id,question,answer:'',tasks:completedTasks,instructors:names}]};
+        try{
+          const checked=await generateText({model,temperature:0,maxRetries:0,maxOutputTokens:1200,abortSignal:signal,
+            output:Output.object({schema:planSchema}),system:safety+
+              'You are the research orchestrator checking whether tool results answer the current conversational goal. You may request another batch of tools. '+
+              'Return tasks:[] if sufficient or if an already-attempted source failed. Do not retry the same task. '+
+              'If reviews were requested but only catalog evidence was fetched, request reviews for the listed instructors. A null professor fans out to every listed instructor automatically. '+
+              'Use details for official course content, syllabus for assessment/workload claims, and reviews for student experience/recommendations. '+
+              'Combine relevant tools when needed, without adding unrelated work. Known course, semester and names are provided; never ask for them again. '+
+              'Do not write the final answer here. directAnswer and clarification should be null unless a truly missing identifier blocks a new task.',
+            prompt:JSON.stringify({question,conversation:context.turns.map(t=>({question:t.question,tasks:t.tasks,instructors:t.instructors})),attempted:completedTasks,
+              evidence:evidence.map(e=>({kind:e.kind,entity:e.entity,status:e.status,limitations:e.limitations,
+                instructors:e.kind==='catalog'?names:undefined,coverage:e.kind==='review_corpus'?(e.data as {coverage:unknown}).coverage:undefined}))})});
+          usage(checked.usage);
+          const next=planSchema.parse(checked.output);this.validatePlan(next,question,activeTerm,extraContext);
+          const newTasks=next.tasks.filter(t=>!attempted.has(JSON.stringify(t)));
+          if(!next.clarification&&newTasks.length&&completedTasks.length<this.config.RESEARCH_MAX_TASKS){
+            plan={...plan,tasks:newTasks,clarification:null,directAnswer:null};continueResearch=true;
+          }
+        }catch{/* Keep successful evidence when the bounded follow-up planner is unavailable. */}
+        return {status:continueResearch?'more_research':'ready'};
       })
       .addNode('answer',async()=>{
         phase='answer';
@@ -97,11 +142,11 @@ export class ResearchAgent implements CourseResearch {
         if(!evidence.length){answer='I couldn’t retrieve enough reliable evidence to answer. Please try again shortly.';return {status:'unavailable'};}
         try{
           const result=await generateText({model,maxRetries:0,maxOutputTokens:1000,abortSignal:signal,
-            system:safety+'Answer directly in roughly 60–120 words, or fewer for simple questions. Use ONLY the evidence below for factual claims. Do not dump sections or tool payloads. No throat-clearing, repeated catalog/date disclaimers, verification boilerplate, generic warnings or statements that there is no universally best professor. Give the qualified recommendation directly. Include important missing-data or historical-source qualifications once, briefly. '
+            system:safety+'Answer directly in roughly 60–120 words, or fewer for simple questions. Use ONLY the evidence below for factual claims. Format the answer with a short **Course** or **Recommendation** heading and concise bullets with **bold professor names**. For multiple requested topics, use two or three short bold headings. Avoid dense paragraphs. Do not dump sections or tool payloads. No throat-clearing, repeated catalog/date disclaimers, verification boilerplate, generic warnings or statements that there is no universally best professor. Give the qualified recommendation directly. Include important missing-data or historical-source qualifications once, briefly. Do not tell users to wait for new reviews when the actual problem is an unverified profile. Ask a basic question only if it can resolve a genuinely missing detail. '
               +'For professor-only questions give unique names. Include other details only when requested. Do not mention seat counts or add a seat disclaimer to professor-only questions. Do not print retrieval dates for stable facts like instructor names. Only include a short checked time for requested seat availability. Write the complete answer as concise plain text or Markdown, not JSON. Do not output URLs or internal evidence IDs; verified source links are appended by code. '
               +'Clearly distinguish official syllabus facts from student opinions. Label a historical syllabus once with its semester and instructor; never attribute historical exam weights to the current offering. '
               +'Use the supplied sourceSemester name; never convert ASU numeric term codes yourself. If historical evidence contains the requested exam/grading information, summarize it with that historical label rather than ignoring it. '
-              +'Syllabus missing/OCR/truncation, ambiguous professor identity, missing meetings, unknown seats, partial pagination and failed workers must be disclosed when relevant. '
+              +'Syllabus missing/OCR/truncation, unverified professor identity (use its explicit reason; do not claim multiple profiles when no exact match was found), missing meetings, unknown seats, partial pagination and failed workers must be disclosed when relevant. '
               +'Review summaries prioritize exact_label reviews. Use review_corpus.coverage for full retrieval counts versus selected excerpts. If excerptsTruncated is true, do not imply you summarized every fetched review; distinguish the summarized excerpt count from total course-specific matches. State course-specific sample size briefly; include date ranges only when materially important or asked. Use only exact_label reviews for course-specific claims; label other reviews as general instructor context. '
               +'Never interpret -1 rating/percentage sentinels as real ratings. Never claim a full search or all reviews unless evidence supports it. '
               +'Evidence reused/ageMs indicate cache reuse; disclose when seats were checked and reused data. Answer the substance of each part of the question with the supported details, not just an introduction. '
@@ -115,18 +160,40 @@ export class ResearchAgent implements CourseResearch {
           answer=prose+(partialReviews&&!/\b(?:partial|incomplete|limited|not all)\b/i.test(prose)?'\nReview coverage is partial.':'')+'\n\n'+researchLinks(evidence);
         }catch{answer=this.partialAnswer(workers);}
         return {status:'answered'};
-      }).addEdge(START,'plan').addEdge('plan','research').addEdge('research','answer').addEdge('answer',END)
+      }).addEdge(START,'plan').addEdge('plan','research').addEdge('research','assess')
+      .addConditionalEdges('assess',()=>continueResearch?'research':'answer',['research','answer']).addEdge('answer',END)
       .compile(this.pool?{checkpointer:createCheckpointer(this.pool)}:{});
     try{await graph.invoke({requestId:id,status:'started'},{configurable:{thread_id:`m3:${id}`}});}
     catch{answer=workers.length?this.partialAnswer(workers):'I couldn’t complete the research request. Please try again shortly.';}
     const instructors=[...new Set(workers.flatMap(w=>w.evidence).filter(e=>e.kind==='catalog')
       .flatMap(e=>(e.data as {results:{instructors:{name:string}[]}[]}).results.flatMap(s=>s.instructors.map(i=>i.name))))];
-    context.result={tasks:plan.tasks.length?plan.tasks:context.turns.at(-1)?.tasks??[],instructors:instructors.length?instructors:context.turns.at(-1)?.instructors??[],
+    context.result={tasks:completedTasks.length?completedTasks:plan.tasks.length?plan.tasks:context.turns.at(-1)?.tasks??[],instructors:instructors.length?instructors:context.turns.at(-1)?.instructors??[],
       sources:[...new Set(workers.flatMap(w=>w.evidence).flatMap(e=>e.sources))]};
     const acceptedModels=[this.config.OPENROUTER_MODEL,...(this.config.OPENROUTER_MODEL==='deepseek/deepseek-v4.1-flash-1017'?['deepseek/deepseek-v4.1-flash-20261017']:[])];
     if(observations.some(o=>o.provider?.toLowerCase()!==this.config.OPENROUTER_PROVIDER.toLowerCase()||!o.model||!acceptedModels.includes(o.model)))answer='The configured model/provider could not be verified. Please try again later.';
     this.observe({requestId:id,status:answer?'answered':'unavailable',modelCalls:budget.models,sourceOperations:budget.tools,elapsedMs:Date.now()-started,inputTokens,outputTokens,observations});
     return answer;
+  }
+  private ensureReviewGoal(plan:ResearchPlan,question:string,activeTerm:string|undefined,context:ResearchContext){
+    const prior=context.turns.slice(-3);
+    const fillingSlot=/\b(?:any|all|either|fine|semester|spring|summer|fall|upcoming)\b/i.test(question)
+      && !/\b(?:seats?|meeting|times?|syllabus|exams?|description|prerequisites?|grading)\b/i.test(question);
+    const goal=(fillingSlot?[...prior.map(t=>t.question),question]:[question]).join(' ');
+    if(!/\b(?:reviews?|ratings?|recommend|best|should I take)\b/i.test(goal))return;
+    const texts=[question,...[...prior].reverse().map(t=>t.question)];
+    const course=texts.map(t=>/\b([a-z]{2,5})\s*-?\s*(\d{3}[a-z]?)\b/i.exec(t)).find(Boolean);
+    const term=texts.map(t=>/\b(?:(?:spring|summer|fall|autumn)\s+20\d{2}|20\d{2}\s+(?:spring|summer|fall|autumn))\b/i.exec(t)?.[0]).find(Boolean)
+      ??[...prior].reverse().flatMap(t=>t.tasks).find(t=>t.semester)?.semester??(activeTerm?semesterName(activeTerm):undefined);
+    if(!course||!term)return;
+    const subject=course[1]!.toUpperCase(),catalog=course[2]!.toUpperCase();
+    if(!plan.tasks.some(t=>t.kind==='reviews'&&(!t.catalog||t.catalog===catalog))){
+      const requested=plan.tasks.find(t=>t.professor)?.professor??null;
+      plan.tasks.push({kind:'reviews',subject,catalog,semester:term,professor:requested,classNumber:null});
+    }
+    for(const task of plan.tasks.filter(t=>t.kind==='reviews')){
+      if(!task.subject&&!task.catalog){task.subject=subject;task.catalog=catalog;task.semester=term;}
+    }
+    plan.clarification=null;plan.directAnswer=null;
   }
   private validatePlan(plan:ResearchPlan,question:string,activeTerm:string|undefined,context:ResearchContext){
     const history=context.turns.map(t=>`${t.question} ${t.answer} ${t.tasks.map(k=>`${k.subject} ${k.catalog} ${k.semester} ${k.professor??''}`).join(' ')} ${t.instructors.join(' ')}`).join('\n');

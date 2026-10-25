@@ -54,7 +54,7 @@ test('screenshot follow-up inherits its replied context and dispatches professor
     const reply=await memory.begin(room,'student','ray-message');const context:ResearchContext={turns:reply.turns};
     const answer=await new ResearchAgent(config,source,scheduler,undefined,d=>diagnostics.push(d),transport).answer('Who is the best professor out of these?',undefined,context);
     assert.match(answer,/Erik/);assert.doesNotMatch(answer,/specify|Which course|checked|catalog indexed/i);
-    assert.equal(peak,2);assert.equal(diagnostics[0]!.modelCalls,2);
+    assert.equal(peak,2);assert.equal(diagnostics[0]!.modelCalls,3);
     assert.equal((await memory.begin({...room,channelId:'another-channel'},'student')).turns.length,0);
     assert.equal((await memory.begin(room,'another-student')).turns.length,0);
   }finally{await cleanup(pool,namespace);await pool.end();}

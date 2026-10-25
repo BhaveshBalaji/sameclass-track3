@@ -102,5 +102,5 @@ test('real graph dispatch synthesizes a question-specific answer from validated 
   const agent=new ResearchAgent(config,source,scheduler,undefined,data=>{diagnostic=data;},transport);
   const answer=await agent.answer('Who teaches CSE 575 in Spring 2027?');
   assert.match(answer,/Example Instructor/);assert.match(answer,/Class Link/);assert.equal(sourceCalls,1);
-  assert.equal(diagnostic?.modelCalls,2);assert.doesNotMatch(answer,/Seats:|Meeting times/);
+  assert.equal(diagnostic?.modelCalls,3);assert.doesNotMatch(answer,/Seats:|Meeting times/);
 });
