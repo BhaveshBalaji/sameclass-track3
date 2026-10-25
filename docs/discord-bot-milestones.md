@@ -1,4 +1,4 @@
-# CourseCrew Discord bot: implementation milestones
+# Ray Discord bot: implementation milestones
 
 Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Application implementation has not started. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
 
@@ -167,7 +167,7 @@ docs/
 - Select and pin mutually compatible runtime/package versions: TypeScript, discord.js, LangGraph.js and its Postgres checkpointer, the AI SDK/OpenRouter model adapter if compatible, Zod, and a Postgres client. Verify the SDK forwards the Relace-only routing policy and the selected model/endpoint actually supports our required structured output and tool calls.
 - Define a reproducible local startup procedure for the minimal Node worker, both Python APIs and local Postgres, with version-pinned database/container configuration and persistent storage. Verify local health, DB connectivity, migrations and a persisted LangGraph checkpoint. Model credentials are needed for extraction/research; the Python services need no model key or student password. Keep Render/Supabase packaging/deployment as a later task.
 - Complete `.env.example` using placeholders and non-secret defaults. Proposed bot variables: `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID`, `DISCORD_PLANNING_CHANNEL_IDS`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_PROVIDER`, `OPENROUTER_ALLOW_FALLBACKS`, `OPENROUTER_REQUIRE_PARAMETERS`, `DATABASE_URL`, `ASU_API_BASE_URL`, and `RMP_API_BASE_URL`. The OpenRouter defaults document the proposed selection now; the bot configuration loader is still to be implemented. These are bot configuration names, not existing Python-service configuration.
-- Provide a Developer Portal checklist: create the CourseCrew application/bot, enable the necessary intent, install in a private test server, and grant the selected channel permissions. Configure the Discord display name as CourseCrew; detect invocations using the actual bot identity/mention metadata rather than matching its name in text. Keep credentials out of chat, logs and Git.
+- Provide a Developer Portal checklist: create the Ray application/bot, enable the necessary intent, install in a private test server, and grant the selected channel permissions. Configure the Discord display name as Ray; detect invocations using the actual bot identity/mention metadata rather than matching its name in text. Keep credentials out of chat, logs and Git.
 - Adopt [mock chat scenarios](mock-chat-scenarios.md), including four synthetic actors, expected extracted preferences, and the silent-participant progression. Convert them to machine-readable replay fixtures in Milestone 1.
 
 **Focused verification**

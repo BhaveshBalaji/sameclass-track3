@@ -1,4 +1,4 @@
-# Mock chat scenarios for CourseCrew
+# Mock chat scenarios for Ray
 
 Prepared as planning/test material. Every student, preference, approval claim and message below is invented. Course codes are research inputs, not assertions that a section exists or that a university approves a requirement. No synthetic course availability or syllabus is a product fallback.
 
@@ -21,9 +21,9 @@ Session: `test:spring-planning`; semester Spring 2027 (`2271`); timezone `Americ
 | `test:m02` | Leo | “Same semester: one 3-credit Tempe elective. My approved choices are CSE 512 or CSE 575. I cannot attend Tuesday or Thursday from 2–6 PM. All other weekday times work. I prefer machine learning/data topics and fewer high-stakes exams.” |
 | `test:m03` | Nina | “I need one 3-credit Tempe elective from my list: CSE 511 or CSE 512. I cannot attend Monday or Wednesday after 4 PM; other weekday times work. I prefer mornings and team projects, but mornings are a preference, not a requirement.” |
 | `test:m04` | Leo | “Let's compare options after lunch.” |
-| `test:m05` | Maya | “@CourseCrew, check our preferences above and find sections we could take together. Give alternatives if one section doesn't work for everyone.” |
+| `test:m05` | Maya | “@Ray, check our preferences above and find sections we could take together. Give alternatives if one section doesn't work for everyone.” |
 
-`@CourseCrew` is readable notation. The machine fixture must set structured assistant-mention metadata; writing this string alone is not proof of a Discord mention.
+`@Ray` is readable notation. The machine fixture must set structured assistant-mention metadata; writing this string alone is not proof of a Discord mention.
 
 ### Expected interpretation
 
@@ -63,13 +63,13 @@ Expected: retain that as Dev's own stated rule, update only Dev, and continue th
 
 Leo sends an actual assistant mention:
 
-> “@CourseCrew, what is CSE 512 about, and what does its syllabus say for our semester? Tell me if the evidence is from an older offering.”
+> “@Ray, what is CSE 512 about, and what does its syllabus say for our semester? Tell me if the evidence is from an older offering.”
 
 Expected: mention Leo, use the selected session term, retrieve available course/syllabus evidence, and clarify section/instructor when necessary for specific claims. Label historical term/instructor and keep old assessments historical. All four profiles and selected-course preferences remain unchanged.
 
 Later, Leo asks:
 
-> “@CourseCrew, who teaches it, how many seats are open, and which instructor fits my preference for fewer high-stakes exams?”
+> “@Ray, who teaches it, how many seats are open, and which instructor fits my preference for fewer high-stakes exams?”
 
 Expected: research the relevant sections/instructors, timestamp seats, resolve RMP identity, and distinguish syllabus facts from student review themes. If assessments or identities are unavailable, say so rather than promising an easier class.
 

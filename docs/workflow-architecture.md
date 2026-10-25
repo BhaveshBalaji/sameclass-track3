@@ -1,10 +1,10 @@
-# CourseCrew workflow and architecture
+# Ray workflow and architecture
 
 Status: the team accepted the recommended direction on October 24, 2026. Use [Discord bot milestones](discord-bot-milestones.md) as the canonical build checklist. This document explains the architecture; it does not report implemented bot functionality.
 
 ## Product workflow
 
-1. Students use a private text channel in a Discord server with CourseCrew installed. An ordinary Discord bot cannot join a group DM. See [Discord's bot account restrictions](https://docs.discord.com/developers/topics/oauth2#bot-vs-user-accounts).
+1. Students use a private text channel in a Discord server with Ray installed. An ordinary Discord bot cannot join a group DM. See [Discord's bot account restrictions](https://docs.discord.com/developers/topics/oauth2#bot-vs-user-accounts).
 2. Establish a planning session, semester, participant roster, and model-processing notice. Students explicitly use Join planning; a channel's accessible members are not automatically its participants.
 3. Students discuss requirements, hard constraints, soft preferences, and explicit flexibility naturally. Store bounded session messages without calling a model for every message.
 4. An actual mention of the assistant triggers a request. Deterministic code recognizes actual mention metadata or a reply to an outstanding clarification addressed to its author.
