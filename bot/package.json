@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test tests/foundation.test.ts tests/planning-unit.test.ts tests/catalog.test.ts tests/research.test.ts tests/research-followup.test.ts tests/research-chain.test.ts",
+    "test": "tsx --test tests/foundation.test.ts tests/planning-unit.test.ts tests/catalog.test.ts tests/research.test.ts tests/research-followup.test.ts tests/research-chain.test.ts tests/context-syllabus.test.ts",
     "start": "node dist/src/worker.js",
     "doctor": "tsx scripts/doctor.ts",
     "db:migrate": "tsx scripts/migrate.ts",

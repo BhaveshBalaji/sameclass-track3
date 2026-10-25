@@ -1,3 +1,4 @@
+import {SYLLABUS_EXTRACTION_LIMIT} from './syllabus-view.js';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { APIClient, APIError } from '../integrations/api.js';
@@ -71,7 +72,7 @@ export class ResearchSources {
     const key=`syllabus:${term}:${chosen.class_nbr}:${task.professor??''}`;
     const result=await this.read(key,'asu',this.evidenceTtl,budget,signal,async()=>{
       try{
-        const exact=await this.asu.get('/api/syllabus/text',exactSyllabus,{term,class_nbr:chosen.class_nbr,max_chars:'18000'},signal);
+        const exact=await this.asu.get('/api/syllabus/text',exactSyllabus,{term,class_nbr:chosen.class_nbr,max_chars:String(SYLLABUS_EXTRACTION_LIMIT)},signal);
         if(exact.class_nbr!==chosen.class_nbr||exact.source_term!==term)throw new APIError('invalid_response');
         return {...exact,status:'ok' as const,requested_term:term,course:`${task.subject} ${task.catalog}`,historical:false,same_professor:null,search_complete:true,warning:null,instructors:chosen.instructors.map(i=>i.name)};
       }catch(error){
@@ -79,7 +80,7 @@ export class ResearchSources {
         if(!(error instanceof APIError&&error.status===404))throw error;
         if(++budget.tools>budget.maxTools)throw new ResearchLimit('Research request limit reached before syllabus fallback.');
         return this.asu.get('/api/syllabus/lookup',fallbackSyllabus,{term,subject:task.subject,catalog_nbr:task.catalog,
-          professor:task.professor??chosen.instructors[0]?.name??'',include_text:'true',max_chars:'18000',max_pages:'1',budget_seconds:'15'},signal);
+          professor:task.professor??chosen.instructors[0]?.name??'',include_text:'true',max_chars:String(SYLLABUS_EXTRACTION_LIMIT),max_pages:'1',budget_seconds:'15'},signal);
       }
     });
     const data=result.value;
@@ -94,7 +95,7 @@ export class ResearchSources {
     if(sameInstructor===false)limitations.push('Fallback syllabus instructor does not match the requested catalog instructor.');
     if(data.warning)limitations.push(data.warning);
     if(!data.search_complete)limitations.push('Syllabus discovery was incomplete.');
-    if(data.truncated)limitations.push('Syllabus text was truncated.');
+    if(data.truncated)limitations.push('Ray’s extracted text reached its character limit; the original syllabus document is unchanged.');
     const unavailable=data.status!=='ok'||!data.text?.trim()||(data.ocr_required||data.extraction_status==='ocr_required');
     if(unavailable)limitations.push((data.ocr_required||data.extraction_status==='ocr_required')?'OCR is required; syllabus text cannot be analyzed.':'No usable syllabus text was retrieved.');
     const sourceTerm=data.source_term??term,sourceId=data.class_nbr??chosen.class_nbr;
@@ -105,7 +106,7 @@ export class ResearchSources {
         direct=link.value.download_url;
       }catch{direct=undefined;limitations.push('The direct syllabus link could not be refreshed.');}
     }
-    return this.evidence(key,'syllabus',task,{...data,same_professor:sameInstructor,requestedSemester:semesterName(term),sourceSemester:semesterName(sourceTerm)},data.retrieved_at,[direct??(data.status==='ok'?this.asu.endpoint('/api/syllabus/document',{class_nbr:sourceId,term:sourceTerm}):catalogUrl({term:sourceTerm,subject:task.subject,catalog:task.catalog}))],
+    return this.evidence(key,'syllabus',task,{...data,extractionLimit:SYLLABUS_EXTRACTION_LIMIT,same_professor:sameInstructor,requestedSemester:semesterName(term),sourceSemester:semesterName(sourceTerm)},data.retrieved_at,[direct??(data.status==='ok'?this.asu.endpoint('/api/syllabus/document',{class_nbr:sourceId,term:sourceTerm}):catalogUrl({term:sourceTerm,subject:task.subject,catalog:task.catalog}))],
       {reused:result.reused,ageMs:result.ageMs},limitations,unavailable?'unavailable':limitations.length?'partial':'ok');
   }
   async findProfessor(task:ResearchTask,budget:ResearchBudget,signal:AbortSignal,record:(e:Evidence)=>void):Promise<Evidence>{

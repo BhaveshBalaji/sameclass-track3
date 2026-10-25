@@ -21,10 +21,21 @@ export class ResearchMemory {
       ON CONFLICT(namespace,room_id,user_id) DO UPDATE SET version=research_context.version+1 RETURNING turns,version`,[this.namespace,roomId(room),userId]);
     const own=(row.rows[0].turns as ResearchTurn[]).slice(-5);
     // An explicit reply picks its branch, rather than unrelated newer messages by this user.
-    return {turns:ref?[ref]:own,version:Number(row.rows[0].version)};
+    let branch=own;
+    if(ref){
+      const position=own.findIndex(t=>t.requestId===ref.requestId);
+      branch=position>=0?own.slice(0,position+1):[ref];
+      const visited=new Set(branch.map(t=>t.requestId));
+      while(branch.length<6&&branch[0]?.parentRequestId){
+        const parent=await this.referenced(room,branch[0].parentRequestId);
+        if(!parent||visited.has(parent.requestId))break;
+        visited.add(parent.requestId);branch.unshift(parent);
+      }
+    }
+    return {turns:branch,version:Number(row.rows[0].version)};
   }
   async finish(room:Room,userId:string,version:number,history:ResearchTurn[],turn:ResearchTurn):Promise<void>{
-    turn={...turn,userId};
+    turn={...turn,userId,parentRequestId:history.at(-1)?.requestId};
     const turns=[...history.filter(t=>t.requestId!==turn.requestId),turn].slice(-6);
     const updated=await this.pool.query(`UPDATE ray_app.research_context SET turns=$4 WHERE namespace=$1 AND room_id=$2 AND user_id=$3 AND version=$5`,
       [this.namespace,roomId(room),userId,JSON.stringify(turns),version]);
