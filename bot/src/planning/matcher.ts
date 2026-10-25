@@ -1,19 +1,20 @@
 import type {Participant,PlanningSession} from '../domain/planning.js';
 import type {Candidate,Constraint,Fit,Projection,Section,TimeWindow} from './types.js';
 import {courseFamilies} from './course-family.js';
+import {isTimeFact} from './attendance.js';
 
 const canonical=(s:string)=>s.replace(/[^a-z0-9]/gi,'').toUpperCase();
 const campus=(s:string)=>({ASUONLINE:'ONLINE',DOWNTOWNPHOENIX:'DTPHX',DOWNTOWN:'DTPHX',POLYTECHNIC:'POLY'} as Record<string,string>)[canonical(s)]??canonical(s);
 const minute=(s:string)=>{const [h,m]=s.split(':').map(Number);return h!*60+m!;};
 function dateOverlap(meeting:Section['meeting_intervals'][number],window:TimeWindow):boolean|'unknown'{
   if(!window.startDate&&!window.endDate)return true;
-  if(!meeting.start_date||!meeting.end_date)return 'unknown';
+  if(!meeting.start_date||!meeting.end_date||!/^\d{4}-\d{2}-\d{2}$/.test(meeting.start_date)||!/^\d{4}-\d{2}-\d{2}$/.test(meeting.end_date))return 'unknown';
   return !((window.endDate&&window.endDate<meeting.start_date)||(window.startDate&&window.startDate>meeting.end_date));
 }
-function timeCheck(section:Section,windows:TimeWindow[]):{conflict:boolean;unknown:boolean}{
+export function timeCheck(section:Section,windows:TimeWindow[]):{conflict:boolean;unknown:boolean}{
   let unknown=!section.meeting_intervals.length;
   for(const meeting of section.meeting_intervals){
-    if(meeting.status!=='scheduled'||!meeting.start||!meeting.end||!meeting.days.length||!Number.isFinite(minute(meeting.start))||!Number.isFinite(minute(meeting.end))||minute(meeting.start)>=minute(meeting.end)){unknown=true;continue;}
+    if(meeting.status!=='scheduled'||!meeting.start||!meeting.end||!meeting.days.length||meeting.days.some(d=>!['MON','TUE','WED','THU','FRI','SAT','SUN'].includes(d))||!/^([01]\d|2[0-3]):[0-5]\d$/.test(meeting.start)||!/^([01]\d|2[0-3]):[0-5]\d$|^24:00$/.test(meeting.end)||!Number.isFinite(minute(meeting.start))||!Number.isFinite(minute(meeting.end))||minute(meeting.start)>=minute(meeting.end)){unknown=true;continue;}
     for(const window of windows){
       if(window.timezone!==section.timezone||!Number.isFinite(minute(window.start))||!Number.isFinite(minute(window.end))||minute(window.start)>=minute(window.end)||(window.startDate&&window.endDate&&window.startDate>window.endDate)){unknown=true;continue;}
       if(!meeting.days.some(day=>window.days.includes(day as TimeWindow['days'][number])))continue;
@@ -24,6 +25,24 @@ function timeCheck(section:Section,windows:TimeWindow[]):{conflict:boolean;unkno
     }
   }
   return {conflict:false,unknown};
+}
+function allowedCheck(section:Section,windows:TimeWindow[]):{conflict:boolean;unknown:boolean}{
+  if(!section.meeting_intervals.length)return {conflict:false,unknown:true};
+  let unknown=false;
+  for(const meeting of section.meeting_intervals){
+    if(meeting.status!=='scheduled'||!meeting.start||!meeting.end||!meeting.days.length){unknown=true;continue;}
+    for(const day of meeting.days){
+      const same=windows.filter(w=>w.days.includes(day as TimeWindow['days'][number])&&w.timezone===section.timezone);
+      if(!same.length){if(windows.some(w=>w.timezone!==section.timezone)){unknown=true;continue;}return {conflict:true,unknown};}
+      if(!same.some(w=>minute(meeting.start!)>=minute(w.start)&&minute(meeting.end!)<=minute(w.end)))return {conflict:true,unknown};
+      if(same.some(w=>w.startDate||w.endDate))unknown=true;
+    }
+  }
+  return {conflict:false,unknown};
+}
+export function sectionsOverlap(a:Section,b:Section){
+  const windows=a.meeting_intervals.filter(m=>m.status==='scheduled'&&m.start&&m.end&&m.days.length).map(m=>({days:m.days as TimeWindow['days'],start:m.start!,end:m.end!,startDate:m.start_date,endDate:m.end_date,timezone:a.timezone}));
+  const result=timeCheck(b,windows);return !windows.length||result.conflict||result.unknown;
 }
 function bundle(section:Section,all:Section[]){
   const proof=section.linked_components;
@@ -48,10 +67,19 @@ function fit(person:Participant,constraints:Constraint[],section:Section,compone
   for(const c of constraints){
     const fact=person.profile.facts[c.factKey];if(!fact)continue;
     handled.add(c.factKey);
+    if(c.factKey==='course_count')continue;
     if(fact.strength==='soft'){
       const label=fact.values.join('; ');preferences.push(`${c.factKey.replace(/_/g,' ')}: ${label}`);
       if(c.understood&&c.kind==='campus'&&c.values.some(v=>campus(v)===campus(section.campus??''))){softScore++;softEvidence.push('Matches the preferred campus');}
-      if(c.understood&&c.kind==='unavailable'&&c.windows.length&&components.every(s=>{const check=timeCheck(s,c.windows);return !check.conflict&&!check.unknown;})){softScore++;softEvidence.push('Published meeting times fit the stated time preference');}
+      if(c.understood&&['unavailable','available'].includes(c.kind)&&c.windows.length){
+        const checks=components.map(s=>c.kind==='available'?allowedCheck(s,c.windows):timeCheck(s,c.windows));
+        if(checks.every(c=>!c.conflict&&!c.unknown)){softScore+=2;softEvidence.push(`Time preference: ${label}`);}
+        else if(checks.some(c=>c.conflict)){
+          softScore-=2;
+          const lunch=/lunch/i.test(label)&&c.windows.some(w=>w.start==='12:00'&&w.end==='14:00'&&components.some(s=>timeCheck(s,[w]).conflict));
+          softEvidence.push(lunch?'Time tradeoff: overlaps the preferred 12–2 PM lunch break':`Time tradeoff: ${label}`);
+        }
+      }
       continue;
     }
     if(!c.understood){unchecked.push(`${c.factKey.replace(/_/g,' ')} needs clarification`);continue;}
@@ -61,10 +89,10 @@ function fit(person:Participant,constraints:Constraint[],section:Section,compone
     }else if(c.kind==='campus'&&fact.strength==='unrestricted')hasCampus=true;
     else if(c.kind==='allowed_courses'&&fact.strength==='unrestricted')hasCourse=true;
     else if(c.kind==='course_credits'&&fact.strength==='unrestricted')hasCredits=true;
-    else if(c.kind==='unavailable'&&fact.strength==='hard'){
+    else if(['unavailable','available'].includes(c.kind)&&fact.strength==='hard'){
       hasTime=true;
       if(!c.windows.length){unchecked.push('Availability could not be interpreted');continue;}
-      for(const s of components){const result=timeCheck(s,c.windows);if(result.conflict)conflicts.push(`Section ${s.class_nbr} overlaps unavailable time`);else if(result.unknown)unchecked.push(`Section ${s.class_nbr} has unresolved meeting/timezone/date information`);}
+      for(const s of components){const result=c.kind==='available'?allowedCheck(s,c.windows):timeCheck(s,c.windows);if(result.conflict)conflicts.push(`Section ${s.class_nbr} ${c.kind==='available'?'is outside stated availability':'overlaps unavailable time'}`);else if(result.unknown)unchecked.push(`Section ${s.class_nbr} has unresolved meeting/timezone/date information`);}
     }else if(c.kind==='course_family'&&fact.strength==='hard'){
       hasCourse=true;
       const families=courseFamilies(c.values);
@@ -84,10 +112,10 @@ function fit(person:Participant,constraints:Constraint[],section:Section,compone
       else if((c.min!==null&&lo<c.min)||(c.max!==null&&hi>c.max))conflicts.push(`Course carries ${lo} credits, outside the requested range`);
     }else if(c.kind==='semester_credits')unchecked.push('Full-semester credit total is not computed');
     else if(c.kind==='course_count'){
-      if((c.min??1)>1)unchecked.push('This is a single-course option, not a complete multi-course schedule');
+      // Course count is enforced by the group schedule allocator.
     }else if(fact.strength==='hard')unchecked.push(`${c.factKey.replace(/_/g,' ')} has not been verified`);
   }
-  for(const [key,fact]of facts)if(!handled.has(key)){
+  for(const [key,fact]of facts)if(!handled.has(key)&&key!=='course_count'){
     if(fact.strength==='hard')unchecked.push(`${key.replace(/_/g,' ')} has not been checked`);
     else if(fact.strength==='soft')preferences.push(`${key.replace(/_/g,' ')}: ${fact.values.join('; ')}`);
   }
@@ -98,7 +126,9 @@ function fit(person:Participant,constraints:Constraint[],section:Section,compone
   }
   // Unrestricted attendance does not establish that the source actually publishes the meeting schedule.
   if(components.some(s=>!s.meeting_intervals.length||s.meeting_intervals.some(m=>m.status==='unknown'||!m.start||!m.end||!m.days.length)))unchecked.push('Some meeting times are unknown');
-  return {userId:person.userId,name:person.name,status:conflicts.length?'conflict':unchecked.length?'unknown':'pass',conflicts:[...new Set(conflicts)],unchecked:[...new Set(unchecked)],preferences,softEvidence,softScore};
+  const unresolvedHardTime=facts.some(([key,f])=>f.strength==='hard'&&isTimeFact(f)&&!constraints.some(c=>c.factKey===key&&c.understood&&['unavailable','available','unrestricted_time'].includes(c.kind)));
+  const unknownTime=!hasTime||unresolvedHardTime||unchecked.some(n=>/meeting|timezone|[Aa]vailability/.test(n));
+  return {timeStatus:conflicts.some(n=>/time|availability/.test(n))?'conflict':unknownTime?'unknown':'checked',userId:person.userId,name:person.name,status:conflicts.length?'conflict':unchecked.length?'unknown':'pass',conflicts:[...new Set(conflicts)],unchecked:[...new Set(unchecked)],preferences,softEvidence,softScore};
 }
 export function matchCandidates(session:PlanningSession,projection:Projection,sections:Section[]):Candidate[]{
   const people=Object.values(session.participants).filter(p=>p.active),known=people.filter(p=>Object.keys(p.profile.facts).length>0);

@@ -1,0 +1,73 @@
+{
+  "note": "Synthetic identities; reproduction of reported recommendation feedback. Not a live Discord replay.",
+  "term": "Spring 2027",
+  "actors": [
+    {
+      "userId": "111111111111111111",
+      "name": "Student A"
+    },
+    {
+      "userId": "222222222222222222",
+      "name": "Student B"
+    }
+  ],
+  "messages": [
+    {
+      "userId": "111111111111111111",
+      "name": "Student A",
+      "id": "test:Student A:0",
+      "content": "yes i need to take 2 cse 500 level courses",
+      "botMention": false
+    },
+    {
+      "userId": "111111111111111111",
+      "name": "Student A",
+      "id": "test:Student A:1",
+      "content": "and i have my on campus work on 9am-12 pm on Mondays and 9-4pm on tuesdays and 9am - 11 am on Wednesdays",
+      "botMention": false
+    },
+    {
+      "userId": "111111111111111111",
+      "name": "Student A",
+      "id": "test:Student A:2",
+      "content": "BUt i kinda prefer taking classes in the noon and morning and not late evening you know....",
+      "botMention": false
+    },
+    {
+      "userId": "111111111111111111",
+      "name": "Student A",
+      "id": "test:Student A:3",
+      "content": "also I like having my lunch time free from 12-2pm",
+      "botMention": false
+    },
+    {
+      "userId": "111111111111111111",
+      "name": "Student A",
+      "id": "test:Student A:4",
+      "content": "i want some easy courses any cse 5xx is alr and im into everything except theory",
+      "botMention": false
+    },
+    {
+      "userId": "222222222222222222",
+      "name": "Student B",
+      "id": "test:Student B:0",
+      "content": "I have to take only one course for spring 2027 semester. Looking forward for an easier course.",
+      "botMention": false
+    },
+    {
+      "userId": "222222222222222222",
+      "name": "Student B",
+      "id": "test:Student B:1",
+      "content": "I am available anytime before 5 PM, anyday works for me.",
+      "botMention": false
+    },
+    {
+      "userId": "222222222222222222",
+      "name": "Student B",
+      "id": "test:Student B:2",
+      "content": "I just want interesting topics related to AI/ML, or NLP, and good professor reviews, course reviews.",
+      "botMention": false
+    }
+  ],
+  "continuations": []
+}

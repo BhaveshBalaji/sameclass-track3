@@ -19,9 +19,10 @@
     "replay": "tsx scripts/replay.ts",
     "register:commands": "tsx scripts/register-commands.ts",
     "check:research": "tsx scripts/check-research.ts",
-    "test:group": "tsx --test tests/group-planning.test.ts tests/conversation-discovery.test.ts",
+    "test:group": "tsx --test tests/group-planning.test.ts tests/conversation-discovery.test.ts tests/recommendation-plan.test.ts",
     "check:planning": "tsx scripts/check-planning.ts",
-    "check:discovery": "tsx scripts/check-discovery.ts"
+    "check:discovery": "tsx scripts/check-discovery.ts",
+    "check:recommendation": "tsx scripts/check-recommendation.ts"
   },
   "dependencies": {
     "@langchain/langgraph": "1.5.2",

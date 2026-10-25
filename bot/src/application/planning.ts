@@ -265,6 +265,8 @@ export class PlanningApplication {
         delete state.currentRequest;
         state.lastRecommendation={inputVersion:snapshot.version,sectionIds:recommendation.sectionIds,createdAt:new Date().toISOString()};
         body.text=recommendation.text;
+        body.inlineMentions=recommendation.inlineMentions?.filter(m=>state.participants[m.userId]?.active&&/^\[\[ray-member:\d+\]\]$/.test(m.marker));
+        body.mentions=[...new Set([...body.mentions,...(body.inlineMentions??[]).map(m=>m.userId)])];
         if(failed.length)body.text+=`\nI couldn’t process the latest preferences for ${failed.map(id=>clean(state.participants[id]?.name??id)).join(', ')}. Their messages are retained for retry; these results do not fully account for those updates. Use /plan recommend to retry; no need to repeat the preferences.`;
         attachQuestions(state,body,true,failed);
         body.requestId=event.id;body.replyTo=event.id;

@@ -1,3 +1,4 @@
+import {PlanningResearchClient} from './planning/research.js';
 import { loadConfig, safeFailure } from './config/index.js';
 import { createPool } from './persistence/database.js';
 import { PlanningApplication } from './application/planning.js';
@@ -28,8 +29,8 @@ async function main() {
       config.RESEARCH_MAX_SECTIONS,config.RESEARCH_SEAT_CACHE_MS,config.RESEARCH_EVIDENCE_CACHE_MS);
     const research = new ResearchAgent(config,sources,scheduler,pool);
     const planner=new GroupPlanningEngine(new ModelPlanningProjection(config,scheduler),
-      new PlanningCatalogClient(new APIClient(config.ASU_API_BASE_URL,config.API_TIMEOUT_MS),scheduler),research,
-      {candidates:config.PLANNING_MAX_CANDIDATES,shortlist:config.PLANNING_RESEARCH_SHORTLIST,timeoutMs:config.PLANNING_TIMEOUT_MS},new ModelSoftFit(config,scheduler));
+      new PlanningCatalogClient(new APIClient(config.ASU_API_BASE_URL,config.API_TIMEOUT_MS),scheduler),new PlanningResearchClient(config,sources),
+      {candidates:config.PLANNING_MAX_CANDIDATES,shortlist:config.PLANNING_RESEARCH_SHORTLIST,timeoutMs:config.PLANNING_TIMEOUT_MS,sourceCalls:config.RESEARCH_MAX_SOURCE_CALLS},new ModelSoftFit(config,scheduler));
     const application = config.DISCORD_BOT_TOKEN ? new PlanningApplication(store,preferenceModel(config),{
       messages: config.PLANNING_MAX_MESSAGES, characters: config.PLANNING_MAX_CHARACTERS,
       participants: config.PLANNING_MAX_PARTICIPANTS,

@@ -1,3 +1,4 @@
+import {PlanningResearchClient} from '../src/planning/research.js';
 /** One opt-in paid demonstration. Synthetic students, live model/APIs, isolated state, no Discord posts. */
 import {loadConfig,safeFailure} from '../src/config/index.js';
 import {preferenceModel} from '../src/model/preferences.js';
@@ -17,7 +18,7 @@ try{
   await baseScenario(h,await fixture());const session=(await h.store.read(h.room))!;
   const scheduler=new ResearchScheduler(),asu=new APIClient(config.ASU_API_BASE_URL,20000),rmp=new APIClient(config.RMP_API_BASE_URL,20000);
   const research=new ResearchAgent(config,new ResearchSources(asu,rmp,scheduler),scheduler);
-  const planner=new GroupPlanningEngine(new ModelPlanningProjection(config,scheduler),new PlanningCatalogClient(asu,scheduler),research,
+  const planner=new GroupPlanningEngine(new ModelPlanningProjection(config,scheduler),new PlanningCatalogClient(asu,scheduler),new PlanningResearchClient(config,new ResearchSources(asu,rmp,scheduler)),
     {candidates:12,shortlist:1,timeoutMs:90000},new ModelSoftFit(config,scheduler));
   const result=await planner.recommend(session,'Find one shared elective for the joined students using their own requirements.',AbortSignal.timeout(90000));
   // Do not print raw student messages, model reasoning, review payloads or signed document URLs.

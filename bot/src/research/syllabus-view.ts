@@ -2,8 +2,8 @@ export const SYLLABUS_EXTRACTION_LIMIT=100000;
 export interface SyllabusCoverage {extractionLimit:number;extractedChars:number;extractionTruncated:boolean;excerptedForModel:boolean;documentUnchanged:true}
 
 /** Select query-relevant passages from the extracted document, rather than only its beginning. */
-export function syllabusView(value:unknown,question:string){
-  const data=value as Record<string,unknown>,text=String(data.text??''),budget=16000;
+export function syllabusView(value:unknown,question:string,budget=16000){
+  const data=value as Record<string,unknown>,text=String(data.text??'');
   const provided=data.pages as {page:number|null;text:string}[]|undefined;
   const pages=provided?.length?provided:[{page:null,text}];
   const terms=[...new Set((question.toLowerCase().match(/[a-z]{4,}/g)??[])

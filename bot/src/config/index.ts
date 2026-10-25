@@ -38,7 +38,7 @@ const schema = z.object({
   OPENROUTER_REASONING_EFFORT: z.enum(['none', 'low', 'high', 'max']).default('none'),
   MODEL_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(45000),
   PLANNING_MAX_CANDIDATES:z.coerce.number().int().min(1).max(12).default(12),
-  PLANNING_RESEARCH_SHORTLIST:z.coerce.number().int().min(0).max(3).default(2),
+  PLANNING_RESEARCH_SHORTLIST:z.coerce.number().int().min(0).max(6).default(4),
   PLANNING_TIMEOUT_MS:z.coerce.number().int().min(10000).max(120000).default(90000),
   PLANNING_MAX_MESSAGES: z.coerce.number().int().min(10).max(500).default(100),
   PLANNING_MAX_CHARACTERS: z.coerce.number().int().min(4000).max(100000).default(30000),

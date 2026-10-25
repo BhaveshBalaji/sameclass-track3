@@ -11,6 +11,16 @@ import { discordSettings } from './commands.js';
 export function allowedMentions(ids: string[]) {
   return { parse: [] as ('roles' | 'users' | 'everyone')[], users: [...new Set(ids)].filter(id => /^\d{17,20}$/.test(id)), repliedUser: false };
 }
+export function discordContent(body:Outgoing,part:number,text:string){
+  const inline=body.inlineMentions??[],permitted=new Set(allowedMentions(body.mentions).users),users:string[]=[];
+  for(const mention of inline){
+    if(text.includes(mention.marker)&&permitted.has(mention.userId)){
+      text=text.replaceAll(mention.marker,`<@${mention.userId}>`);users.push(mention.userId);
+    }
+  }
+  const heading=part===0?[...permitted].filter(id=>!inline.some(m=>m.userId===id)):[];
+  return {content:`${heading.map(id=>`<@${id}>`).join(' ')}${heading.length?'\n':''}${text}`,users:[...new Set([...heading,...users])]};
+}
 export function components(body: Outgoing) {
   if (!body.buttons?.length) return [];
   return [new ActionRowBuilder<ButtonBuilder>().addComponents(body.buttons.map(button => new ButtonBuilder()
@@ -26,8 +36,7 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
     const channel = await client.channels.fetch(room.channelId);
     if (!channel || channel.type !== ChannelType.GuildText || channel.guildId !== room.guildId) throw new Error('Configured planning channel is not a server text channel.');
     const delivered = await app.store.deliver(room,async (body,part,text) => {
-      const mentions = part === 0 ? allowedMentions(body.mentions).users : [];
-      const content = `${mentions.map(id => `<@${id}>`).join(' ')}${mentions.length ? '\n' : ''}${text}`;
+      const {content,users:mentions}=discordContent(body,part,text);
       if (part === 0 && interaction && body.requestId === interaction.id) {
         const message = await interaction.editReply({content,flags:MessageFlags.SuppressEmbeds,allowedMentions:allowedMentions(mentions),components:components(body)});
         return message.id;

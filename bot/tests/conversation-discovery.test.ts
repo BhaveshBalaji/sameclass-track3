@@ -103,7 +103,7 @@ test('topic relevance selects AI for bounded research without claiming it is eas
     {async search(){return {count:2,total:2,results:sections,complete:true,stop_reason:'exhausted',pages_fetched:1,retrieved_at:'2026-10-25T02:00:00Z'};}},
     {async answer(question){lookups.push(question);return 'Assessment evidence unavailable.';}},{candidates:1,shortlist:1,timeoutMs:2000});
   const result=await engine.recommend(session,'Find courses for us',AbortSignal.timeout(2000));
-  assert.equal(lookups.length,1);assert.match(lookups[0]!,/CSE 571/);assert.match(result.text,/checks incomplete/);assert.doesNotMatch(result.text,/guaranteed easy|verified fit/);
+  assert.equal(lookups.length,1);assert.match(lookups[0]!,/CSE 571/);assert.match(result.text,/requirements remain unknown/);assert.doesNotMatch(result.text,/guaranteed easy|verified fit/);
 });
 
 let pool:pg.Pool;const namespaces:string[]=[];
@@ -120,7 +120,7 @@ test('conversation replay starts discovery for both students without demanding a
   assert.equal(seen.length,0); // Ordinary conversation does not invoke the assistant.
   await app.recommend(h.room,'recommend',data.actors[1]!);await h.drain();
   assert.equal(seen.length,1);assert.equal(seen[0]!.participants['test:ann']!.profile.facts.unavailability!.values.length,3);
-  const text=h.delivered.map(m=>m.text).join('\n');assert.match(text,/Student A/);assert.match(text,/Student B/);assert.match(text,/Student A: 2/);
+  const text=h.delivered.map(m=>m.text).join('\n');assert.ok(h.delivered.some(m=>m.mentions.includes('test:ann')));assert.ok(h.delivered.some(m=>m.mentions.includes('test:bhav')));assert.match(text,/\d\/2 courses suggested/);
   assert.doesNotMatch(text,/Which courses|approved list for|How many credits|Which campus|Would you like to share/);
   assert.equal((await h.store.read(h.room))!.clarifications.length,0);
   await app.profile(h.room,'profile',data.actors[1]!);await h.drain();

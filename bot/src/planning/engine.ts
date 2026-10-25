@@ -2,121 +2,89 @@ import {END,START,StateGraph,StateSchema} from '@langchain/langgraph';
 import {z} from 'zod';
 import {randomUUID} from 'node:crypto';
 import type {PlanningSession} from '../domain/planning.js';
-import {clean} from '../domain/planning.js';
 import {semesterName} from '../domain/semester.js';
 import type {CourseResearch} from '../application/catalog.js';
+import type {ResearchBudget} from '../research/types.js';
 import {matchCandidates} from './matcher.js';
 import {includeCourseFamilies} from './course-family.js';
 import {discoveryRelevance} from './discovery-relevance.js';
-import type {Candidate,GroupPlanner,PlanningCatalog,PlanningProjection,Projection,Recommendation,Section,SoftFitAssessor,PlanningQuery} from './types.js';
+import {attendanceSession,attendanceProjection} from './attendance.js';
+import {qualitySignals} from './quality.js';
+import {allocate,eligible} from './allocate.js';
+import {renderPlan} from './render.js';
+import type {Candidate,GroupPlanner,PlanningCatalog,PlanningProjection,Projection,Recommendation,Section,SoftFitAssessor,PlanningQuery,PlanningResearch,OfferingResearch} from './types.js';
 
 export function isGroupRequest(text:string){return /\b(?:together|for (?:all of us|our group)|shared (?:classes|courses|options)|our (?:schedules|requirements)|group plan|plan (?:classes|courses) for us)\b/i.test(text);}
+interface Limits {candidates:number;shortlist:number;timeoutMs:number;sourceCalls?:number;parallel?:boolean}
 export class GroupPlanningEngine implements GroupPlanner{
-  constructor(private projector:PlanningProjection,private catalog:PlanningCatalog,private research?:CourseResearch,
-    private limits={candidates:12,shortlist:2,timeoutMs:90000},private softFit?:SoftFitAssessor){}
-  async recommend(session:PlanningSession,question:string,parentSignal:AbortSignal):Promise<Recommendation>{
-    const signal=AbortSignal.any([parentSignal,AbortSignal.timeout(this.limits.timeoutMs)]);
-    let projection:Projection={queries:[],participants:[]},sections:Section[]=[],ranked:Candidate[]=[],notes:string[]=[],sources:string[]=[],evidence:{candidate:Candidate;text:string}[]=[];
+  constructor(private projector:PlanningProjection,private catalog:PlanningCatalog,private research?:PlanningResearch|CourseResearch,
+    private limits:Limits={candidates:12,shortlist:4,timeoutMs:90000},private softFit?:SoftFitAssessor){}
+  async recommend(original:PlanningSession,question:string,parentSignal:AbortSignal):Promise<Recommendation>{
+    const session=attendanceSession(original),signal=AbortSignal.any([parentSignal,AbortSignal.timeout(this.limits.timeoutMs)]);
+    const budget:ResearchBudget={signal,tools:0,models:0,maxTools:this.limits.sourceCalls??24,maxModels:0,refresh:false};
+    let projection:Projection={queries:[],participants:[]},sections:Section[]=[],ranked:Candidate[]=[],notes:string[]=[],researched:Candidate[]=[];
     const graph=new StateGraph(new StateSchema({requestId:z.string(),status:z.string()}))
-      .addNode('interpret',async()=>{signal.throwIfAborted();projection=includeCourseFamilies(session,await this.projector.project(session,question,signal));return {status:'interpreted'};})
+      .addNode('interpret',async()=>{
+        signal.throwIfAborted();projection=attendanceProjection(session,includeCourseFamilies(session,await this.projector.project(session,question,signal)));
+        return {status:'interpreted'};
+      })
       .addNode('catalog',async()=>{
         const campusFacts=projection.participants.flatMap(p=>p.constraints.filter(c=>c.kind==='campus'&&c.understood));
         const online=campusFacts.some(c=>c.values.some(v=>/online/i.test(v)));
         const allOnline=campusFacts.length>0&&campusFacts.every(c=>c.values.length>0&&c.values.every(v=>/online/i.test(v)));
         const deliveries:('A'|'O')[]=online?(allOnline?['O']:['A','O']):['A'];
         const queries:PlanningQuery[]=projection.queries.flatMap(q=>deliveries.map(delivery=>({term:session.term,subject:q.subject||undefined,catalog:q.catalog||undefined,keyword:q.keyword||undefined,delivery})));
-        if(queries.length>4)notes.push('Search is bounded across courses/programs; additional matches may exist.');
         const results=await Promise.allSettled(queries.slice(0,4).map(q=>this.catalog.search(q,signal)));
+        if(queries.length>4)notes.push('Catalog query limit.');
         for(const result of results){
-          if(result.status==='rejected'){notes.push('One catalog lookup failed; other results are retained.');continue;}
-          if(!result.value.complete)notes.push('Catalog coverage is partial.');
+          if(result.status==='rejected'){notes.push('One catalog lookup failed.');continue;}
+          if(!result.value.complete)notes.push('Partial catalog coverage.');
           sections.push(...result.value.results);
         }
         sections=[...new Map(sections.map(s=>[`${s.term}:${s.class_nbr}`,s])).values()];
-        sections.sort((a,b)=>discoveryRelevance(session,b)-discoveryRelevance(session,a));
-        // Preserve components needed to check shortlisted lectures, even after limiting the number of primary candidates.
-        const groups=new Map<string,Section[]>();
-        for(const s of sections.filter(s=>!['LAB','REC','DIS'].includes((s.component??'').toUpperCase()))){const key=`${s.subject}:${s.catalog_nbr}:${s.campus}`;groups.set(key,[...(groups.get(key)??[]),s]);}
-        const primary:Section[]=[];
-        while(primary.length<this.limits.candidates&&[...groups.values()].some(g=>g.length))for(const group of groups.values()){
-          const s=group.shift();if(s&&primary.length<this.limits.candidates)primary.push(s);
-        }
-        const ids=new Set(primary.flatMap(s=>s.linked_components?.required_class_numbers??[]));
-        if(primary.length<sections.filter(s=>!['LAB','REC','DIS'].includes((s.component??'').toUpperCase())).length)notes.push('Candidate search was bounded; more options may exist.');
-        sections=[...primary,...sections.filter(s=>ids.has(s.class_nbr)&&!primary.some(p=>p.class_nbr===s.class_nbr))];
         return {status:'retrieved'};
       })
       .addNode('match',()=>{
         signal.throwIfAborted();ranked=matchCandidates(session,projection,sections);
-        ranked.sort((a,b)=>Number(b.shared)-Number(a.shared)||b.covered-a.covered
-          ||a.fits.filter(f=>f.status==='conflict').length-b.fits.filter(f=>f.status==='conflict').length
-          ||discoveryRelevance(session,b.section)-discoveryRelevance(session,a.section));
+        const count=(c:Candidate)=>c.fits.filter(f=>eligible(c,f.userId)).length;
+        ranked.sort((a,b)=>count(b)-count(a)||discoveryRelevance(session,b.section)-discoveryRelevance(session,a.section)
+          ||b.fits.reduce((n,f)=>n+f.softScore,0)-a.fits.reduce((n,f)=>n+f.softScore,0));
+        if(ranked.length>this.limits.candidates)notes.push('Candidate limit.');
+        ranked=ranked.slice(0,this.limits.candidates);
         return {status:'matched'};
       })
       .addNode('research',async()=>{
-        if(!this.research)return {status:'matched_without_research'};
-        const shortlist=ranked.filter(c=>c.fits.some(f=>Object.keys(session.participants[f.userId]!.profile.facts).length>0&&f.status!=='conflict')).slice(0,this.limits.shortlist);
-        const jobs=await Promise.allSettled(shortlist.map(async candidate=>{
-          const s=candidate.section,prof=s.instructors.length===1?` with ${s.instructors[0]!.name}`:'';
-          const interests=[...new Set(candidate.fits.flatMap(f=>f.preferences))].join('; ').slice(0,1200);
-          const text=await this.research!.answer(`For ${s.subject} ${s.catalog_nbr} in ${semesterName(session.term)}, section ${s.class_nbr}${prof}, briefly research syllabus assessment/workload and course-specific professor reviews relevant to these preferences: ${interests||'no soft priorities supplied'}. Label historical evidence. Do not claim schedule compatibility.`,session.term,{turns:[],signal,offeringScope:{subject:s.subject,catalog:s.catalog_nbr,semester:semesterName(session.term),sectionId:s.class_nbr,instructors:s.instructors.map(i=>i.name),delivery:/online/i.test(s.campus??'')?'O':'A'}});
-          return {candidate,text};
-        }));
-        signal.throwIfAborted();
-        evidence=jobs.filter((r):r is PromiseFulfilledResult<{candidate:Candidate;text:string}>=>r.status==='fulfilled').map(r=>r.value);
-        if(this.softFit){try{await this.softFit.assess(session,evidence,signal);}catch{notes.push('Some soft preferences lack a reliable evidence assessment.');}}
-        ranked.sort((a,b)=>Number(b.shared)-Number(a.shared)||b.covered-a.covered||a.fits.filter(f=>f.status==='conflict').length-b.fits.filter(f=>f.status==='conflict').length
-          ||b.fits.reduce((n,f)=>n+f.softScore,0)-a.fits.reduce((n,f)=>n+f.softScore,0));
-        if(jobs.some(r=>r.status==='rejected'))notes.push('Some optional syllabus/review research failed; constraint checks are retained.');
+        if(!this.research||!this.limits.shortlist)return {status:'matched_without_research'};
+        const provisional=allocate(session,ranked);
+        const assigned=provisional.students.flatMap(s=>s.candidates);
+        const shortlist=[...new Set([...assigned,...ranked])].filter(c=>c.fits.some(f=>eligible(c,f.userId))).slice(0,this.limits.shortlist);
+        const inspect=async(candidate:Candidate):Promise<OfferingResearch>=>{
+          const provider=this.research!;
+          if('inspect' in provider)return provider.inspect(candidate.section,session.term,signal,budget);
+          // Compatibility for test/adaptor callers. Free prose is never rendered or trusted as evidence.
+          await provider.answer(`For ${candidate.section.subject} ${candidate.section.catalog_nbr} in ${semesterName(session.term)}, section ${candidate.section.class_nbr}, retrieve assessment and review evidence only.`,session.term,{turns:[],signal});
+          return {sectionId:candidate.section.class_nbr,evidence:[],limitations:['Structured evidence unavailable.']};
+        };
+        const results:PromiseSettledResult<OfferingResearch>[]=[];
+        if(this.limits.parallel===false){for(const candidate of shortlist){try{results.push({status:'fulfilled',value:await inspect(candidate)});}catch(reason){results.push({status:'rejected',reason});}}}
+        else results.push(...await Promise.allSettled(shortlist.map(inspect)));
+        results.forEach((result,index)=>{
+          const candidate=shortlist[index]!;
+          candidate.research=result.status==='fulfilled'&&result.value.sectionId===candidate.section.class_nbr?result.value:
+            {sectionId:candidate.section.class_nbr,evidence:[],limitations:['Section research unavailable or mismatched.']};
+        });
+        researched=shortlist;
+        for(const candidate of shortlist)qualitySignals(session,candidate);
+        if(this.softFit){try{await this.softFit.assess(session,shortlist.map(candidate=>({candidate,text:'',records:candidate.research!.evidence})),signal);}catch{notes.push('Evidence analysis unavailable.');}}
+        if(shortlist.length<ranked.filter(c=>c.fits.some(f=>eligible(c,f.userId))).length)notes.push('Research shortlist limit.');
         return {status:'researched'};
       }).addEdge(START,'interpret').addEdge('interpret','catalog').addEdge('catalog','match').addEdge('match','research').addEdge('research',END).compile();
-    await graph.invoke({requestId:randomUUID(),status:'started'});signal.throwIfAborted();
-    if(!projection.queries.length)return {text:'I couldn’t derive a catalog search from the saved preferences yet. A subject/level such as CSE 5xx, a topic such as AI, or a specific course is enough to start; an approved course list is not required.',sectionIds:[]};
-    if(!ranked.length)return {text:'I found no usable section listings in this bounded search. '+notes.join(' ')+' Share another course or broaden the search; your requirements are unchanged.',sectionIds:[]};
-    const known=Object.values(session.participants).filter(p=>p.active&&Object.keys(p.profile.facts).length).length;
-    const shared=ranked.filter(c=>c.shared),chosen=shared.slice(0,3);
-    let text=`**Group options · ${semesterName(session.term)}**\n`;
-    const requests=Object.values(session.participants).filter(p=>p.active).map(p=>{
-      const count=p.profile.facts.course_count?.values.join('; ');
-      const families=Object.values(p.profile.facts).filter(f=>f&&/5xx|[1-9]xx|[1-9]00\s*[-–]/i.test(f.values.join(' '))).flatMap(f=>f!.values);
-      return `${clean(p.name)}${count?`: ${clean(count)}`:''}${families.length?` · ${clean([...new Set(families)].join('; '))}`:''}`;
-    });
-    text+=`Planning for ${requests.join(' | ')}.\n`;
-    if(!known)text+='No participant requirements are known yet. These are preliminary catalog options, not verified fits.\n';
-    if(!shared.length)text+='No single returned option avoids all known conflicts. I have kept everyone’s hard constraints.\n';
-    else text+='These are single-course options, not a complete semester schedule.\n';
-    function show(candidate:Candidate,label:string){
-      const s=candidate.section,unknown=candidate.fits.some(f=>f.status==='unknown')||!candidate.bundleVerified;
-      const heading=s.open_seats===0?'No open seats observed':unknown?'Preliminary — checks incomplete':'Matches the stated constraints';
-      const meetings=s.meeting_intervals.filter(m=>m.status==='scheduled'&&m.start&&m.end).map(m=>`${m.days.join('/')} ${m.start}–${m.end}`).join('; ')||'meeting times unknown';
-      return `\n**${label}: ${s.subject} ${s.catalog_nbr} · section ${s.class_nbr}**\n${heading}. ${clean(s.instructors.map(i=>i.name).join(', ')||'Instructor not listed')}; ${meetings} (${clean(s.timezone)}). ${s.open_seats===null?'Seats unknown':`${s.open_seats} open seats observed`}.\n`
-        +candidate.fits.map(f=>`• **${clean(f.name)}:** ${f.status==='conflict'?clean(f.conflicts.join('; ')):f.status==='pass'?'Stated hard constraints checked':`No known conflict; ${clean(f.unchecked.slice(0,3).join('; '))}`}${f.softEvidence.length?`; soft fit: ${clean(f.softEvidence.slice(0,2).join('; '))}`:f.preferences.length?`; priorities still to assess: ${clean(f.preferences.slice(0,2).join('; '))}`:''}`).join('\n')
-        +(candidate.componentNotes.length?'\n'+candidate.componentNotes.join(' '):'')
-        +`\n[Class Link](${s.class_url})\n`;
-    }
-    chosen.forEach((c,index)=>{const verifiedBackup=index>0&&c.bundleVerified&&c.fits.every(f=>f.status==='pass')&&c.components.every(s=>(s.open_seats??0)>0);text+=show(c,verifiedBackup?'Backup':`Option ${index+1}`);sources.push(c.section.class_nbr);});
-    // Individual alternatives are chosen on their own fit, not by silently relaxing the group constraints.
-    for(const person of Object.values(session.participants).filter(p=>p.active&&Object.keys(p.profile.facts).length)){
-      if(chosen.some(c=>c.fits.find(f=>f.userId===person.userId)?.status==='pass'))continue;
-      const alternative=ranked.find(c=>c.fits.find(f=>f.userId===person.userId)?.status==='pass')??ranked.find(c=>c.fits.find(f=>f.userId===person.userId)?.status==='unknown');
-      if(alternative&&!chosen.includes(alternative)){
-        const s=alternative.section;
-        const own=alternative.fits.find(f=>f.userId===person.userId)!;
-        text+=`\n**${clean(person.name)}’s alternative:** ${s.subject} ${s.catalog_nbr}, section ${s.class_nbr}${own.status!=='pass'?` — preliminary: ${clean(own.unchecked.slice(0,2).join('; '))}`:alternative.bundleVerified?' — stated hard constraints checked':' — lab/recitation compatibility unchecked'}. [Class Link](${s.class_url})\n`;
-        sources.push(s.class_nbr);
-      }else if(!shared.length){
-        const blocked=ranked.flatMap(c=>c.fits.filter(f=>f.userId===person.userId&&f.status==='conflict').flatMap(f=>f.conflicts));
-        text+=`\n**${clean(person.name)}:** ${blocked.length?clean([...new Set(blocked)].slice(0,2).join('; ')):'Not enough known requirements to verify an alternative'}.\n`;
-      }
-    }
-    for(const item of evidence){
-      const s=item.candidate.section;
-      text+=`\n**Research · ${s.subject} ${s.catalog_nbr}, section ${s.class_nbr}**\n${item.text}\n`;
-    }
-    const silent=Object.values(session.participants).filter(p=>p.active&&!Object.keys(p.profile.facts).length);
-    if(silent.length)text+=`\n**Coverage:** ${known} participant(s) supplied requirements; ${silent.map(p=>clean(p.name)).join(', ')} ${silent.length===1?'still has':'still have'} unknown preferences. Their silence is not treated as flexibility.\n`;
-    if(notes.length)text+='\n'+[...new Set(notes)].join(' ')+'\n';
-    text+='\nStudent-approved lists are unverified claims. Degree/prerequisite eligibility and complete-semester totals are not verified.';
-    return {text,sectionIds:[...new Set(sources)]};
+    try{await graph.invoke({requestId:randomUUID(),status:'started'});}catch(error){parentSignal.throwIfAborted();if(!ranked.length)throw error;notes.push('Optional research deadline reached.');}
+    parentSignal.throwIfAborted();
+    if(!projection.queries.length)return {text:'A subject/level, topic or specific course is enough to start discovery. I could not derive a search from the saved facts yet; an approved list is not required.',sectionIds:[]};
+    if(!ranked.length)return {text:'No usable sections were returned in this bounded search. Your requirements are unchanged.',sectionIds:[]};
+    // Rank and present the same scoped evidence. Never append competing worker recommendation paragraphs.
+    const finalPool=researched.length?researched:ranked;
+    return renderPlan(session,allocate(session,finalPool),ranked,notes);
   }
 }

@@ -7,7 +7,7 @@ import {explicitCourseRequest} from './explicit-course-request.js';
 
 export function preferenceModel(config: Config, request:typeof fetch=fetch): LanguageService {
   const model = createModel(config,[],request);
-  const options = () => ({ model, maxRetries: 0, maxOutputTokens: 3000,
+  const options = () => ({ model, temperature:0, maxRetries: 0, maxOutputTokens: 3000,
     abortSignal: AbortSignal.timeout(config.MODEL_TIMEOUT_MS) });
   return {
     async classify(content) {
@@ -34,6 +34,7 @@ export function preferenceModel(config: Config, request:typeof fetch=fetch): Lan
           + 'Work hours are hard unavailability. Morning/noon, before 5 PM when phrased as like/prefer, and free days "if possible" are soft preferences. '
           + 'AI means artificial intelligence interests; databases are topic interests; easier/lighter courses and job-preparation time are workload preferences. '
           + 'A field update replaces that field: when adding a constraint, preserve existing applicable constraints unless explicitly retracted. '
+          + 'An explicit availability boundary (I am available anytime before 5 PM) is hard availability, not a preference or unrestricted time. Saying any day works removes only day restrictions. '
           + 'Cannot/must/need are hard; prefer/like are soft; explicitly any/unrestricted dimensions use unrestricted strength. '
           + 'Do not turn soft morning preferences into unavailable times. flexibility contains only explicitly unrestricted dimensions. '
           + 'Use exact source message IDs and verbatim quote substrings from the provided new messages for every changed field. '

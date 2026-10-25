@@ -40,6 +40,7 @@ export interface Incoming extends Room, Actor {
 }
 export interface Outgoing {
   id: string; text: string; mentions: string[]; clarificationIds: string[];
+  inlineMentions?:{marker:string;userId:string}[];
   requestId?: string; replyTo?: string;
   buttons?: { label: string; action: 'join' | 'leave' | 'reset'; sessionId: string; token?: string; actorId?: string }[];
 }
