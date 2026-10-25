@@ -25,6 +25,9 @@ interface LiveVoice {
 export class DiscordVoice {
   private live?: LiveVoice;
   private joining = false;
+  private diagnostic(phase:string,data:Record<string,unknown>={}):void{
+    if(this.config.VOICE_DIAGNOSTICS)console.log(JSON.stringify({event:'voice_diagnostic',phase,...data}));
+  }
   constructor(private config: Config, private client: Client, private app: PlanningApplication,
     private backend: (room: Room, sessionId: string) => VoiceBackend) {}
 
@@ -119,28 +122,33 @@ export class DiscordVoice {
 
   private async capture(userId:string):Promise<void>{
     const live=this.live;
-    if(!live?.session.accepts(userId)||live.captures.has(userId))return;
+    if(!live?.session.accepts(userId)){this.diagnostic('speaking_not_opted_in_or_paused');return;}
+    if(live.captures.has(userId)){this.diagnostic('speaking_during_pending_capture');return;}
+    const captureId=Date.now();let packets=0,pcmBytes=0,peakEnergy=0;
+    this.diagnostic('capture_started',{captureId});
     // Subscribe immediately to retain the wake phrase while authorization is checked.
     const receive=live.connection.receiver.subscribe(userId,{end:{behavior:EndBehaviorType.AfterSilence,duration:700}});
     const decoder=new SpeechDecoder();let scribe:ScribeUtterance|undefined,pending:Buffer[]=[],bytes=0,voiced=0,ended=false,closed=false;
     const close=()=>{if(closed)return;closed=true;clearTimeout(timeout);receive.destroy();decoder.close();scribe?.close();live.captures.delete(userId);};
     const timeout=setTimeout(()=>{receive.destroy();scribe?.finish();},30000);
     live.captures.set(userId,close);
-    receive.on('error',close);
+    receive.on('error',(error)=>{this.diagnostic('receive_error',{captureId,packets,pcmBytes,type:error.name});close();});
     receive.on('data',(packet:Buffer)=>{
       if(closed||!live.session.accepts(userId)){close();return;}
       try{
         const pcm=decoder.decode(packet);
+        packets++;pcmBytes+=pcm.length;peakEnergy=Math.max(peakEnergy,Math.round(speechEnergy(pcm)));
         if(speechEnergy(pcm)>300){voiced++;if(voiced===3)live.session.interrupt();}else voiced=0;
         if(scribe)scribe.write(pcm);else{bytes+=pcm.length;if(bytes>160000){close();return;}pending.push(pcm);}
-      }catch{close();}
+      }catch{this.diagnostic('decode_error',{captureId,packets,pcmBytes});close();}
     });
-    receive.on('end',()=>{ended=true;scribe?.finish();});
+    receive.on('end',()=>{this.diagnostic('capture_ended',{captureId,packets,pcmBytes,peakEnergy});ended=true;scribe?.finish();});
     const actor=live.session.participants.get(userId);
     if(!actor||!await this.backend(live.room,live.sessionId).authorized(actor)||closed||this.live!==live){close();return;}
     scribe=new ScribeUtterance(this.config.ELEVENLABS_API_KEY,text=>{
+      this.diagnostic('transcript_completed',{captureId,characters:text.length,packets,pcmBytes});
       close();if(this.live===live&&live.session.accepts(userId))void live.session.transcript(userId,text).catch(()=>{});
-    },()=>{close();if(this.live===live)void live.status?.edit({content:'Voice transcription failed. Please try again or use text.',allowedMentions:{parse:[]}}).catch(()=>{});});
+    },()=>{this.diagnostic('transcription_failed',{captureId,packets,pcmBytes});close();if(this.live===live)void live.status?.edit({content:'Voice transcription failed. Please try again or use text.',allowedMentions:{parse:[]}}).catch(()=>{});});
     for(const pcm of pending)scribe.write(pcm);pending=[];
     if(ended)scribe.finish();
   }

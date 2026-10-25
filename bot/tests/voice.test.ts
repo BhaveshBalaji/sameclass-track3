@@ -92,6 +92,19 @@ test('Scribe buffers before readiness and returns only completed transcripts',()
   socket.event({message_type:'committed_transcript',text:'Hey Ray, hello.'});assert.deepEqual(transcripts,['Hey Ray, hello.']);
 });
 
+test('the next agent waits for the prior socket to close in a one-conversation workspace',async()=>{
+  const first=new Socket(),second=new Socket();let requests=0;
+  const callbacks:AgentCallbacks={audio:()=>{},text:()=>{},complete:()=>{},failed:()=>assert.fail('unexpected failure'),tool:async()=>({})};
+  const create=(socket:Socket)=>new ElevenAgent({ELEVENLABS_API_KEY:'synthetic',ELEVENLABS_AGENT_ID:'synthetic'},callbacks,()=>{
+    queueMicrotask(()=>{socket.emit('open');socket.event({type:'conversation_initiation_metadata',conversation_initiation_metadata_event:{agent_output_audio_format:'pcm_16000'}});});
+    return socket as unknown as WebSocket;
+  },async()=>{requests++;return Response.json({signed_url:'wss://api.elevenlabs.io/v1/convai/conversation?token=synthetic'});},2000,0);
+  const a=create(first);await a.start('first');
+  first.close=()=>{first.readyState=2;};a.close();
+  const b=create(second),starting=b.start('second');await tick();assert.equal(requests,1);
+  first.readyState=3;first.emit('close');await starting;assert.equal(requests,2);b.close();
+});
+
 test('audio-idle completion waits for tool results and final answer text when the provider omits its completion event',async()=>{
   const socket=new Socket();let release!:(result:unknown)=>void,completions=0;
   const agent=new ElevenAgent({ELEVENLABS_API_KEY:'synthetic',ELEVENLABS_AGENT_ID:'synthetic'},{
@@ -145,6 +158,13 @@ test('addressed-turn budget pauses before making another provider connection',as
   session.join(actor);await session.transcript(actor.userId,'Hey Ray, hello.');
   await session.transcript(actor.userId,'Hey Ray, another question.');
   assert.equal(connections,1);assert.equal(session.listening,false);session.close();
+});
+test('the observed E-RAY transcription variant can address Ray',async()=>{
+  let requests=0;
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},tool:async()=>({})},
+    {audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},()=>({start:async()=>{},message:()=>{requests++;},close:()=>{}}));
+  session.join(actor);await session.transcript(actor.userId,'E-RAY, what have you noted for me?');
+  assert.equal(requests,1);session.close();
 });
 
 test('pause/resume, context reset and leave/rejoin invalidate transcripts awaiting authorization or storage',async()=>{

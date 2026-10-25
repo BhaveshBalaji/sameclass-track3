@@ -61,6 +61,7 @@ const schema = z.object({
   DISCORD_GUILD_ID: z.string().default(''),
   DISCORD_PLANNING_CHANNEL_IDS: z.string().default(''),
   VOICE_ENABLED: boolean('false'),
+  VOICE_DIAGNOSTICS: boolean('false'),
   ELEVENLABS_API_KEY: z.string().trim().default(''),
   ELEVENLABS_AGENT_ID: z.string().trim().default(''),
   DISCORD_VOICE_CHANNEL_ID: z.string().default(''),

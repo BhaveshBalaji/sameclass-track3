@@ -66,7 +66,7 @@ export class VoiceSession {
       if(!authorized){this.leave(userId);return;}
       text = text.trim().slice(0,4000);
       if (!text) return;
-      addressed = /^(?:(?:hey|hi|okay|ok|so)\s*[,!.]?\s*)?ray\b[\s,:.!-]*/i.test(text);
+      addressed = /^(?:(?:hey|hi|okay|ok|so|e)\s*[,!.-]?\s*)?ray\b[\s,:.!-]*/i.test(text);
       followup = this.followup?.userId === userId && this.followup.until > this.now();
       await this.backend.intake(actor, `voice:${randomUUID()}`, text, admission.signal);
       if (admission.signal.aborted||!this.accepts(userId)) return;

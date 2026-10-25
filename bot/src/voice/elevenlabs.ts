@@ -14,6 +14,7 @@ const createSocket: SocketFactory = (url, headers) => new WebSocket(url, { heade
 
 /** A private authenticated agent connection. No SDK/browser microphone required. */
 export class ElevenAgent {
+  private static closing:Promise<void>=Promise.resolve();
   private socket?: WebSocket;
   private closed = false;
   private controller = new AbortController();
@@ -28,10 +29,14 @@ export class ElevenAgent {
   private completed = false;
   constructor(private config: Pick<Config, 'ELEVENLABS_API_KEY' | 'ELEVENLABS_AGENT_ID'>,
     private callbacks: AgentCallbacks, private socketFactory: SocketFactory = createSocket,
-    private request: typeof fetch = fetch, private audioIdleMs = 2000) {}
+    private request: typeof fetch = fetch, private audioIdleMs = 2000, private reconnectDelayMs = 1000) {}
 
   async start(context: string): Promise<void> {
     try {
+      // A one-call workspace may still count a just-closed socket briefly.
+      // Wait for close acknowledgement and cleanup before opening another turn.
+      await ElevenAgent.closing;
+      if(this.closed)return;
       const url = new URL('https://api.elevenlabs.io/v1/convai/conversation/get-signed-url');
       url.searchParams.set('agent_id', this.config.ELEVENLABS_AGENT_ID);
       const response = await this.request(url, { headers: { 'xi-api-key': this.config.ELEVENLABS_API_KEY },
@@ -112,7 +117,17 @@ export class ElevenAgent {
   close(): void {
     if (this.closed) return;
     this.closed = true; clearTimeout(this.timer);clearTimeout(this.idleTimer); this.controller.abort();
-    this.socket?.close();
+    const socket=this.socket;
+    if(socket&&socket.readyState!==WebSocket.CLOSED){
+      const settled=new Promise<void>(resolve=>{
+        const timeout=setTimeout(resolve,1500);
+        socket.once('close',()=>{clearTimeout(timeout);resolve();});
+      });
+      ElevenAgent.closing=Promise.all([ElevenAgent.closing,settled]).then(async()=>{
+        if(this.reconnectDelayMs)await new Promise(resolve=>setTimeout(resolve,this.reconnectDelayMs));
+      });
+      socket.close();
+    }
   }
 }
 

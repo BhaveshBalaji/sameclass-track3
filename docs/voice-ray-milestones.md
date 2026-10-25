@@ -170,7 +170,13 @@ The combined opt-in live probe passed with one local notes-tool call and 261,120
 
 With the normal worker stopped and General empty, the Discord proof reached a ready voice connection and finished half a second of silent raw-PCM playback through the actual encoding/transport path. No member audio was captured. Afterwards enabled voice in the ignored local `.env`, registered `/voice` commands, and started the single local supervisor/worker. Startup confirmed Voice Ray controls and Gateway readiness; the database and both Python APIs passed health checks. Real participant read-back, interruptions, named group results and two rehearsals remain pending. The user has been invited to perform the live check; no milestone is marked complete on the strength of the synthetic or silent probes alone.
 
-- [ ] V0: live agent/tool/speech/transcription and empty-channel Discord playback proved; real two-person microphone/hearing/interruptions pending.
+### First real microphone troubleshooting
+
+The user reported no audible response. Read-only state checks confirmed that Ray was connected and neither muted nor deafened. Metadata-only capture diagnostics then verified full human utterance delivery through Discord decode and realtime transcription (one capture contained 128 packets / 81,920 PCM bytes and a 37-character transcript). This proves the microphone-to-transcription path for that participant, not human playback or two-speaker isolation.
+
+The trace exposed an observed `E-RAY` wake-phrase transcription variant and a provider capacity rejection when an interrupted connection was immediately replaced in the one-conversation workspace. Added the narrow wake-phrase variant and serialized reconnects behind socket-close acknowledgement plus a short cleanup interval. Eleven voice tests and build pass, including a close-acknowledgement regression. Headphones/one-question-then-pause are used to distinguish acoustic re-triggering from intended interruptions. Audible replies and the full group rehearsal remain unverified until the user confirms them.
+
+- [ ] V0: live agent/tool/speech/transcription, one participant's real microphone transcription and empty-channel Discord playback proved; human hearing, two-speaker isolation and interruptions pending.
 - [ ] V1: course tool and follow-up code tested; live spoken questions pending.
 - [ ] V2: separate notes/corrections/reset tested with isolated Postgres; live speaker recognition and read-back pending.
 - [ ] V3: named allocation presentation and stale-result guards tested; live group readout pending.
