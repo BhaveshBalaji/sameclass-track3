@@ -7,6 +7,7 @@
     "node": ">=24.8.0 <25"
   },
   "scripts": {
+    "test:voice": "tsx --test tests/voice.test.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test tests/foundation.test.ts tests/planning-unit.test.ts tests/catalog.test.ts tests/research.test.ts tests/research-followup.test.ts tests/research-chain.test.ts tests/context-syllabus.test.ts",
@@ -25,18 +26,22 @@
     "check:recommendation": "tsx scripts/check-recommendation.ts"
   },
   "dependencies": {
+    "@discordjs/voice": "0.19.2",
     "@langchain/langgraph": "1.5.2",
     "@langchain/langgraph-checkpoint-postgres": "1.1.2",
     "@openrouter/ai-sdk-provider": "3.1.0",
     "ai": "7.0.153",
     "discord.js": "14.27.0",
     "dotenv": "18.0.9",
+    "opusscript": "0.1.1",
     "pg": "8.23.1",
+    "ws": "8.22.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
     "@types/pg": "8.23.1",
+    "@types/ws": "8.18.2",
     "tsx": "4.23.15",
     "typescript": "7.0.2"
   }

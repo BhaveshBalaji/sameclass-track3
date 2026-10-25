@@ -126,6 +126,14 @@ If time runs short, cut automatic suggestions, extra voices/persona work, simult
 
 ## Progress
 
+### October 25 scheduled build — V0 foundation
+
+Created a dedicated ElevenLabs development agent (`bot/voice-agent.json`) through the plugin; unrelated agents were not changed. Read-back confirmed authenticated access, PCM 16 kHz output, voice recording disabled and one-day agent transcript retention. This is not zero retention; Scribe retention is separate. The local research client tool is attached. Added opt-in configuration, pinned Discord voice/DAVE and Opus/WebSocket dependencies, bounded Scribe utterance transport, private signed-URL agent transport, audio conversion, speaker/turn controller and Discord voice adapter foundation.
+
+Five focused offline tests passed, including an actual synthetic Opus encode/decode, protocol tool dispatch, no late audio/tool result after cancellation, finalized transcription, consent/author isolation, follow-up ownership and pause. TypeScript build passed. These checks do not establish live provider or Discord audio behavior.
+
+The project has Discord credentials but no `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID` or configured voice channel. The plugin connection can manage agents but does not supply a runtime key to the Node worker. Set the dedicated agent ID from the manifest and a runtime key/channel locally before live Scribe/agent/Discord proof. No real two-person voice check has run; V0 remains incomplete. Continue independently testable wiring and later services as scaffolding, not as a claim that the live transport gate passed.
+
 - [ ] V0: voice transport and conversational tool proof.
 - [ ] V1: live conversational course questions.
 - [ ] V2: separate student notes and corrections.

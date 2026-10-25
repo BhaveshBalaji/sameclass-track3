@@ -60,6 +60,13 @@ const schema = z.object({
   DISCORD_APPLICATION_ID: z.string().default(''),
   DISCORD_GUILD_ID: z.string().default(''),
   DISCORD_PLANNING_CHANNEL_IDS: z.string().default(''),
+  VOICE_ENABLED: boolean('false'),
+  ELEVENLABS_API_KEY: z.string().trim().default(''),
+  ELEVENLABS_AGENT_ID: z.string().trim().default(''),
+  DISCORD_VOICE_CHANNEL_ID: z.string().default(''),
+  VOICE_MAX_PARTICIPANTS: z.coerce.number().int().min(1).max(4).default(4),
+  VOICE_MAX_DURATION_SECONDS: z.coerce.number().int().min(60).max(1200).default(1200),
+  VOICE_FOLLOWUP_SECONDS: z.coerce.number().int().min(0).max(60).default(30),
 });
 export type Config = z.infer<typeof schema>;
 export class ConfigurationError extends Error { constructor(message: string) { super(message); this.name = 'ConfigurationError'; } }
@@ -70,6 +77,12 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
   }
   const result = schema.safeParse(env);
   if (!result.success) throw new ConfigurationError(`Invalid configuration: ${[...new Set(result.error.issues.map(i => i.path.join('.')))].join(', ')}`);
+  if (result.data.VOICE_ENABLED) {
+    const missing = ['ELEVENLABS_API_KEY', 'ELEVENLABS_AGENT_ID', 'DISCORD_BOT_TOKEN']
+      .filter(key => !result.data[key as keyof typeof result.data]);
+    if (!/^\d{17,20}$/.test(result.data.DISCORD_VOICE_CHANNEL_ID)) missing.push('DISCORD_VOICE_CHANNEL_ID');
+    if (missing.length) throw new ConfigurationError(`Missing voice configuration: ${missing.join(', ')}`);
+  }
   return result.data;
 }
 export function loadConfig(): Config {

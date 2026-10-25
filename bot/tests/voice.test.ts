@@ -1,0 +1,97 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import OpusScript from 'opusscript';
+import type WebSocket from 'ws';
+import { parseConfig } from '../src/config/index.js';
+import { discordPCM, SpeechDecoder } from '../src/voice/audio.js';
+import { ElevenAgent, ScribeUtterance, type AgentCallbacks } from '../src/voice/elevenlabs.js';
+import { VoiceSession, type ConversationalConnection } from '../src/voice/session.js';
+
+class Socket extends EventEmitter {
+  readyState = 1;
+  sent: any[] = [];
+  send(value: string) { this.sent.push(JSON.parse(value)); }
+  close() { this.readyState=3;this.emit('close'); }
+  event(value:unknown) {this.emit('message',Buffer.from(JSON.stringify(value)));}
+}
+const config=parseConfig({});
+const actor={userId:'alice',name:'Alice'};
+const other={userId:'bob',name:'Bob'};
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+
+test('voice is opt-in and errors identify configuration names without exposing keys',()=>{
+  assert.equal(config.VOICE_ENABLED,false);
+  assert.throws(()=>parseConfig({VOICE_ENABLED:'true',ELEVENLABS_API_KEY:'secret-value'}),error=>{
+    assert.match(String(error),/ELEVENLABS_AGENT_ID/);assert.doesNotMatch(String(error),/secret-value/);return true;
+  });
+});
+
+test('real Opus packets decode into Scribe audio; output converts to Discord PCM',()=>{
+  const encoder=new OpusScript(48000,2,OpusScript.Application.VOIP),decoder=new SpeechDecoder();
+  try{
+    const decoded=decoder.decode(encoder.encode(Buffer.alloc(960*4),960));
+    assert.equal(decoded.length,320*2);
+    const pcm=Buffer.alloc(4);pcm.writeInt16LE(123,0);pcm.writeInt16LE(-321,2);
+    const output=discordPCM(pcm,16000);
+    assert.equal(output.length,24);assert.equal(output.readInt16LE(0),123);assert.equal(output.readInt16LE(12),-321);
+    assert.throws(()=>discordPCM(pcm,22050),/Unsupported/);
+  }finally{decoder.close();encoder.delete();}
+});
+
+test('agent protocol authenticates, dispatches tools and suppresses late output after cancellation',async()=>{
+  const socket=new Socket();let completeTool!:(value:unknown)=>void;let toolSignal:AbortSignal|undefined;let played=0;
+  const callbacks:AgentCallbacks={audio:()=>played++,text:()=>{},complete:()=>{},failed:()=>assert.fail('unexpected failure'),
+    tool:async(_call,signal)=>{toolSignal=signal;return new Promise(resolve=>{completeTool=resolve;});}};
+  const agent=new ElevenAgent({ELEVENLABS_API_KEY:'synthetic',ELEVENLABS_AGENT_ID:'synthetic'},callbacks,()=>{
+    queueMicrotask(()=>{socket.emit('open');socket.event({type:'conversation_initiation_metadata',conversation_initiation_metadata_event:{agent_output_audio_format:'pcm_16000'}});});
+    return socket as unknown as WebSocket;
+  },async(input,options)=>{
+    assert.equal(new URL(String(input)).hostname,'api.elevenlabs.io');
+    assert.equal((options!.headers as Record<string,string>)['xi-api-key'],'synthetic');
+    return Response.json({signed_url:'wss://api.elevenlabs.io/v1/convai/conversation?token=synthetic'});
+  });
+  await agent.start('synthetic context');agent.message('Hey Ray, research this course.');
+  assert.ok(socket.sent.some(e=>e.type==='contextual_update'));
+  socket.event({type:'client_tool_call',client_tool_call:{tool_name:'research_course',tool_call_id:'call1',parameters:{question:'test'}}});
+  socket.event({type:'audio',audio_event:{audio_base_64:Buffer.alloc(4).toString('base64')}});
+  assert.equal(played,1);agent.close();assert.equal(toolSignal?.aborted,true);
+  completeTool({answer:'late'});await tick();
+  socket.event({type:'audio',audio_event:{audio_base_64:'AAAA'}});
+  assert.equal(played,1);assert.equal(socket.sent.filter(e=>e.type==='client_tool_result').length,0);
+});
+
+test('Scribe buffers before readiness and returns only completed transcripts',()=>{
+  const socket=new Socket();const transcripts:string[]=[];
+  const scribe=new ScribeUtterance('synthetic',text=>transcripts.push(text),()=>assert.fail('unexpected failure'),()=>socket as unknown as WebSocket);
+  scribe.write(Buffer.alloc(20000));scribe.finish();assert.equal(socket.sent.length,0);
+  socket.event({message_type:'session_started'});
+  assert.equal(socket.sent[0].message_type,'input_audio_chunk');assert.equal(socket.sent.at(-1).commit,true);
+  socket.event({message_type:'partial_transcript',text:'wrong partial'});assert.equal(transcripts.length,0);
+  socket.event({message_type:'committed_transcript',text:'Hey Ray, hello.'});assert.deepEqual(transcripts,['Hey Ray, hello.']);
+});
+
+test('roster consent, follow-up ownership, pause and stale callbacks are enforced',async()=>{
+  let now=1000,authorized=true;const intake:string[]=[],tools:string[]=[],callbacks:AgentCallbacks[]=[];let plays=0,stops=0;
+  const session=new VoiceSession(config,{
+    authorized:async()=>authorized,intake:async(a,_id,text)=>{intake.push(a.userId+':'+text);},
+    tool:async(a)=>{tools.push(a.userId);return {};},
+  },{audio:()=>plays++,stop:()=>stops++,finish:()=>{},status:()=>{}},cb=>{
+    callbacks.push(cb);return {start:async()=>{},message:()=>{},close:()=>{}} satisfies ConversationalConnection;
+  },()=>now);
+  await session.transcript('alice','Hey Ray, hello');assert.equal(callbacks.length,0);
+  session.join(actor);session.join(other);
+  await session.transcript('alice','I work Tuesdays.');assert.equal(callbacks.length,0);assert.equal(intake.length,1);
+  await session.transcript('alice','Hey Ray, what about CSE 445?');assert.equal(callbacks.length,1);
+  await callbacks[0]!.tool({tool_call_id:'1',tool_name:'research_course',parameters:{userId:'bob'}},new AbortController().signal);
+  assert.deepEqual(tools,['alice']);
+  session.interrupt();callbacks[0]!.audio(Buffer.alloc(4),16000);assert.equal(plays,0);
+  await assert.rejects(()=>callbacks[0]!.tool({tool_call_id:'2',tool_name:'x',parameters:{}},new AbortController().signal),/expired/);
+  await session.transcript('alice','And its grading?');assert.equal(callbacks.length,2);
+  await session.transcript('bob','I prefer mornings.');assert.equal(callbacks.length,2);
+  await session.transcript('alice','Another question.');assert.equal(callbacks.length,2);
+  session.pause();await session.transcript('alice','Hey Ray, listen.');assert.equal(callbacks.length,2);
+  session.resume();now+=31000;await session.transcript('alice','No wake phrase.');assert.equal(callbacks.length,2);
+  authorized=false;await session.transcript('alice','Hey Ray, hello');assert.equal(session.participants.has('alice'),false);
+  assert.ok(stops>0);session.close();
+});
