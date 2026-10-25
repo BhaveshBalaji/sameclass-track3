@@ -3,6 +3,16 @@ import { semesterCode, semesterName } from '../domain/semester.js';
 import type { CatalogQuery, CatalogResult, CatalogSource } from '../integrations/catalog.js';
 
 export interface CourseResearch { answer(question:string,activeTerm?:string):Promise<string> }
+type CatalogField = 'instructors' | 'seats' | 'meetings';
+const allFields: CatalogField[] = ['instructors','seats','meetings'];
+export function catalogFields(question:string):CatalogField[] {
+  if (/\b(?:details|everything)\b/i.test(question)) return allFields;
+  const fields:CatalogField[] = [];
+  if (/\b(?:professors?|instructors?|teachers?|teach(?:es|ing)?)\b/i.test(question)) fields.push('instructors');
+  if (/\b(?:seats?|availability|capacity|enroll(?:ment|ed)?)\b/i.test(question)) fields.push('seats');
+  if (/\b(?:when|times?|days?|schedule|meet(?:s|ing|ings)?)\b/i.test(question)) fields.push('meetings');
+  return fields.length ? fields : allFields;
+}
 /** Fast path for explicit information questions; group planning still uses its classifier. */
 export function isCourseQuestion(text:string):boolean {
   return /\b(?:who|what|how|are there|is there|show|check|list|tell me)\b/i.test(text)
@@ -36,8 +46,28 @@ export function catalogUrl(q:CatalogQuery):string {
   for (const [k,v] of Object.entries({campusOrOnlineSelection:'A',honors:'F',promod:'F',searchType:'all',subject:q.subject,catalogNbr:q.catalog,term:q.term})) url.searchParams.set(k,v);
   return url.toString();
 }
-export function renderCatalog(q:CatalogQuery,data:CatalogResult):string {
+export function renderCatalog(q:CatalogQuery,data:CatalogResult,fields:CatalogField[]=allFields):string {
   const course = `${q.subject} ${q.catalog}`, limit=8;
+  const checked = `Checked ${new Date(data.retrieved_at).toLocaleString('en-US',{timeZone:'America/Phoenix',timeZoneName:'short'})}.`;
+  const empty = data.complete ? 'ASU returned no listings for this course and semester.' : 'No listings returned in this partial search; I cannot confirm there are none.';
+  if (fields.length === 1 && fields[0] === 'instructors') {
+    // Aggregate the whole fetched result, not the first eight displayed sections.
+    const names = new Map<string,string>();
+    let unassigned = 0;
+    for (const section of data.results) {
+      const listed = section.instructors.map(i=>i.name.trim().replace(/\s+/g,' ')).filter(Boolean);
+      if (!listed.length) unassigned++;
+      for (const name of listed) names.set(name.normalize('NFKC').toLowerCase(),name);
+    }
+    const unique = [...names.values()].sort((a,b)=>a.localeCompare(b));
+    const list = unique.slice(0,25).map(name=>`• ${clean(name.slice(0,100))}`).join('\n');
+    return `**${course} · ${semesterName(q.term)}**\n\n`
+      + (data.results.length ? list || 'ASU has not listed instructors for the returned sections.' : empty)
+      + (unique.length > 25 ? `\nShowing 25 of ${unique.length} listed instructor names.` : '')
+      + (unassigned && unique.length ? `\n\n${unassigned} ${unassigned === 1 ? 'section has' : 'sections have'} no listed instructor yet.` : '')
+      + (!data.complete ? '\n\nPartial search; additional instructors may be listed in other sections.' : '')
+      + `\n\n[ASU source](${catalogUrl(q)}) · ${checked}`;
+  }
   const sections = data.results.slice(0,limit).map(s => {
     const instructors = s.instructors.map(i=>i.name.trim()).filter(Boolean);
     const meetings = s.meeting_intervals.map(m => m.status === 'scheduled' && m.start && m.end && m.days.length
@@ -46,25 +76,24 @@ export function renderCatalog(q:CatalogQuery,data:CatalogResult):string {
     // Build the ASU link from validated identity, never from model-generated/source text.
     const url = `${catalogUrl(q)}#detailsOpen=${s.class_nbr}-${s.course_id}`;
     return `**Section ${s.class_nbr}** · ${clean(s.title.slice(0,150))}\n`
-      + `Instructor: ${instructors.length ? instructors.map(n=>clean(n.slice(0,100))).join(', ') : 'Not listed'}\n`
-      + `Seats: ${s.open_seats === null ? 'Unknown' : `${s.open_seats} open`}${s.total_seats === null ? '' : ` / ${s.total_seats} total`}\n`
-      + `${meetings.join('; ') || 'Meeting times not listed'} · ${clean(s.timezone)}`
-      + `${s.campus ? ` · ${clean(s.campus)}` : ''}${s.session ? ` · Session ${clean(s.session)}` : ''}\n[ASU section](${url})`;
+      + (fields.includes('instructors') ? `Instructor: ${instructors.length ? instructors.map(n=>clean(n.slice(0,100))).join(', ') : 'Not listed'}\n` : '')
+      + (fields.includes('seats') ? `Seats: ${s.open_seats === null ? 'Unknown' : `${s.open_seats} open`}${s.total_seats === null ? '' : ` / ${s.total_seats} total`}\n` : '')
+      + (fields.includes('meetings') ? `${meetings.join('; ') || 'Meeting times not listed'} · ${clean(s.timezone)}\n` : '')
+      + `${s.campus ? `${clean(s.campus)} · ` : ''}${s.session ? `Session ${clean(s.session)} · ` : ''}[ASU section](${url})`;
   });
   const total = typeof data.total === 'number' ? String(data.total) : `${data.total.value}${data.total.relation === 'eq' ? '' : '+'}`;
   const coverage = data.complete ? `Search complete: ${data.count} section(s) returned.`
     : `Partial search: ${data.count} section(s) returned, ${total} reported by ASU across ${data.pages_fetched} page(s). More listings may exist.`;
-  const empty = data.complete ? 'ASU returned no listings for this course and semester.' : 'No listings returned in this partial search; I cannot confirm there are none.';
   return `**${course} · ${semesterName(q.term)}**\n\n${sections.join('\n\n') || empty}\n\n${coverage}`
     + (data.count>limit ? ` Showing the first ${limit}; [view all on ASU](${catalogUrl(q)}).` : ` [ASU search](${catalogUrl(q)}).`)
-    + `\nChecked ${new Date(data.retrieved_at).toLocaleString('en-US',{timeZone:'America/Phoenix',timeZoneName:'short'})}. Seats are observations, not reservations or eligibility checks.`;
+    + `\n${checked}${fields.includes('seats') ? ' Seats are observations, not reservations or eligibility checks.' : ''}`;
 }
 export class CatalogResearch implements CourseResearch {
   constructor(private source:CatalogSource) {}
   async answer(question:string,activeTerm?:string):Promise<string> {
     const query = parseCatalogQuestion(question,activeTerm);
     if (typeof query === 'string') return query;
-    try {return renderCatalog(query,await this.source.search(query));}
+    try {return renderCatalog(query,await this.source.search(query),catalogFields(question));}
     catch {return `I couldn’t retrieve reliable ASU listings for ${query.subject} ${query.catalog} in ${semesterName(query.term)}. Try again shortly or check [ASU directly](${catalogUrl(query)}).`;}
   }
 }

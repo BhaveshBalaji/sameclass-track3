@@ -28,7 +28,7 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
     const delivered = await app.store.deliver(room,async (body,part,text) => {
       const mentions = part === 0 ? allowedMentions(body.mentions).users : [];
       const content = `${mentions.map(id => `<@${id}>`).join(' ')}${mentions.length ? '\n' : ''}${text}`;
-      const message = await channel.send({ content, allowedMentions: allowedMentions(mentions), components: part === 0 ? components(body) : [],
+      const message = await channel.send({ content, flags: MessageFlags.SuppressEmbeds, allowedMentions: allowedMentions(mentions), components: part === 0 ? components(body) : [],
         nonce: createHash('sha256').update(`${body.id}:${part}`).digest('hex').slice(0,24), enforceNonce: true });
       return message.id;
     });

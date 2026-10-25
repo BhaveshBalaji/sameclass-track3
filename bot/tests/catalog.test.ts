@@ -6,7 +6,7 @@ import { repoRoot } from '../src/config/index.js';
 import { semesterCode, semesterName, semesterChoices } from '../src/domain/semester.js';
 import { APIClient, APIError } from '../src/integrations/api.js';
 import { CatalogClient, catalogSchema } from '../src/integrations/catalog.js';
-import { CatalogResearch, parseCatalogQuestion, renderCatalog, isCourseQuestion } from '../src/application/catalog.js';
+import { CatalogResearch, parseCatalogQuestion, renderCatalog, isCourseQuestion, catalogFields } from '../src/application/catalog.js';
 import { messageParts } from '../src/persistence/planning-store.js';
 
 const fixture = () => readFile(join(repoRoot,'class_search_api/example_response.json'),'utf8').then(JSON.parse).then(value => catalogSchema.parse(value));
@@ -72,4 +72,33 @@ test('multi-section Discord answers retain source links within message limits', 
   const answer=renderCatalog({term:'2271',subject:'CSE',catalog:'575'},data),parts=messageParts(answer);
   assert.ok(parts.length>1);assert.ok(parts.every(part=>part.length<=1700));
   for(let i=0;i<8;i++)assert.ok(parts.some(part=>part.includes(`**Section ${90000+i}**`)&&part.includes(`#detailsOpen=${90000+i}-000000)`)));
+});
+test('professor questions deduplicate all fetched sections and omit unrelated section details', async () => {
+  const data=await fixture();
+  data.results=Array.from({length:9},(_,i)=>({...data.results[0]!,class_nbr:String(90000+i),
+    instructors:i===1 ? [] : [{name:i===8 ? 'Another Instructor' : i===2 ? ' example   instructor ' : 'Example Instructor'}]}));
+  data.count=9;
+  const research=new CatalogResearch({async search(){return data;}});
+  const answer=await research.answer('What professors are teaching CSE 240 in Spring 2027?');
+  assert.match(answer,/Another Instructor/); // The ninth section must not be dropped.
+  assert.equal((answer.match(/example instructor/gi)??[]).length,1);
+  assert.match(answer,/1 section has no listed instructor/);
+  assert.doesNotMatch(answer,/Seats:|Meeting times|Section 900|TEMPE|reservations/);
+  assert.equal((answer.match(/\]\(https:/g)??[]).length,1);
+  assert.ok(answer.length<700);
+  data.complete=false;
+  assert.match(await research.answer('Who teaches CSE 240 in Spring 2027?'),/Partial search/);
+  data.results.forEach(s=>{s.instructors=[];});
+  assert.match(await research.answer('Who teaches CSE 240 in Spring 2027?'),/has not listed instructors/);
+  data.results=[];data.count=0;data.complete=true;
+  assert.match(await research.answer('Who teaches CSE 240 in Spring 2027?'),/no listings/);
+});
+test('combined and other catalog questions show only requested fields', async () => {
+  const data=await fixture(),research=new CatalogResearch({async search(){return data;}});
+  assert.deepEqual(catalogFields('Who teaches CSE 575 and are there seats?'),['instructors','seats']);
+  assert.deepEqual(catalogFields('List professors across all sections of CSE 575'),['instructors']);
+  const combined=await research.answer('Who teaches CSE 575 in Spring 2027 and are there seats?');
+  assert.match(combined,/Instructor:/);assert.match(combined,/Seats:/);assert.doesNotMatch(combined,/13:00|America\/Phoenix/);
+  const times=await research.answer('When does CSE 575 meet in Spring 2027?');
+  assert.match(times,/13:00/);assert.doesNotMatch(times,/Instructor:|Seats:/);
 });
