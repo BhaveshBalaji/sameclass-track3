@@ -11,6 +11,8 @@ This repository contains the course-research backend for SameClass: two independ
 
 ## Bot implementation plan
 
+**Next extension: Voice Ray.** A real ElevenLabs conversational agent will join a Discord voice channel, answer course questions through Ray's existing tools, retain separate student preferences, and explain group recommendations by name. The scoped [voice milestones V0–V4](docs/voice-ray-milestones.md) start with a live audio proof and keep proactive suggestions optional. Voice is planned; existing text functionality remains the working foundation. The local voice demo takes priority over an owned web UI or hosted voice deployment.
+
 The APIs and Ray’s Milestones 0–2 are complete. Milestone 3 adds an LLM research workflow for catalog facts, course descriptions, syllabi and RMP reviews. Live API/model checks pass; the new Discord answers and message visibility are awaiting the user's smoke check. See the [bot setup guide](bot/README.md) for one-command local startup and validation. Start with the [canonical milestone checklist](docs/discord-bot-milestones.md), consult the [workflow and architecture](docs/workflow-architecture.md) while implementing, and use the [mock chat scenarios](docs/mock-chat-scenarios.md) for testing. The [integration validation](docs/integration-validation.md) records API capabilities and limitations the bot must handle.
 
 ## Start both services

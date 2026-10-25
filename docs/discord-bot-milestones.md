@@ -1,10 +1,11 @@
 # Ray Discord bot: implementation milestones
 
-Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestones 0–2 are complete. Milestone 3 implementation and live research checks are in place; its new Discord answers and command/reply visibility are awaiting the user’s smoke check. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
+Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestones 0–2 are complete. Milestones 3–4 have implementation and verification notes below; their outstanding Discord smoke checks remain separate from implementation status. On October 25, the user added a modest ElevenLabs Discord voice extension: use [Voice Ray milestones V0–V4](voice-ray-milestones.md) before deployment. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical overall build checklist; the linked voice checklist defines voice scope and acceptance criteria. Recorded decisions supersede earlier open interview questions.
 
 ## 1. Agreed scope
 
-- Build a Discord bot first, using a private text channel in a Discord server. Discord supplies the chat UI.
+- Build a Discord bot using a private planning text channel and an opt-in linked voice channel in a Discord server. Discord supplies the UI. Text planning is the existing foundation; the next extension is a real ElevenLabs conversational agent, with tools reusing the existing Ray backend.
+- Voice demo scope: one room, two to four opted-in students, conversational course questions, separate preference notes/corrections, interruptible replies, named group recommendations and a recap. Validate audio connectivity first; proactive suggestions are optional. See [the voice scope, cut rules and milestones](voice-ray-milestones.md). An owned UI and hosted voice deployment are not prerequisites for this demo.
 - Initial demo audience: ASU graduate CS students choosing electives. Use the ASU catalog integration; do not claim support for other universities or a complete degree audit.
 - Students explicitly join planning through a button and receive a model-processing notice. Session membership is distinct from server/channel membership.
 - Use OpenRouter for the model calls powering a TypeScript coordinator and scoped research subagents, with Zod validation, LangGraph.js workflow orchestration and Postgres persistence (local initially, Supabase when deployed). Start with `deepseek/deepseek-v4.1-flash-1017` served by Relace, subject to the focused live capability/quality checks below. Preserve the committed Python catalog/RMP services behind typed HTTP clients.
@@ -155,6 +156,7 @@ docs/
 | 2 | One live catalog question answered in Discord | One real selected-term course/instructor/seat query |
 | 3 | Bounded parallel syllabus and professor research | Concurrency/partial-failure check plus one live research scenario |
 | 4 | Shared/individual recommendations, refinement and expanded complex-workflow mock suite | Deterministic fit checks, multi-step regressions and a live-data demonstration |
+| V0–V4 | ElevenLabs Discord voice: transport proof, course conversation, notes, named recommendations and demo polish | Live audio/tool proof first; speaker isolation, interruptions and consistent spoken/text recommendations; [separate checklist](voice-ray-milestones.md) |
 | 5 | Deploy to Render/Supabase and prepare the repeatable demo | Migration/configuration parity, restart/recovery and real Discord smoke checks |
 | Optional 6 | Owned chat UI adapter | Same application behavior through independent web rooms |
 
@@ -297,6 +299,8 @@ This is the original brief's first implementation milestone. Use the following s
 **Done when:** the synthetic group receives useful grounded recommendations, required-component compatibility is verified or explicitly unchecked, corrections remain author-scoped, and the expanded multi-step regression suite passes. Stop before Milestone 5.
 
 ### Milestone 5 — Deploy the verified local app and prepare the demo
+
+Voice scope update (October 25): complete the local [V0–V4 voice demo](voice-ray-milestones.md) before prioritizing deployment. Existing Render/Supabase plans remain a later path; verify the selected host supports the required Discord UDP/audio connection and dependencies before promising hosted voice. Local demonstration is sufficient for the voice extension. This paragraph supersedes any implication below that hosting is required to demonstrate the new feature.
 
 **Build**
 

@@ -2,6 +2,18 @@
 
 Status: the team accepted the recommended direction on October 24, 2026. Use [Discord bot milestones](discord-bot-milestones.md) as the canonical build checklist. This document explains the architecture. Milestone 0 local configuration/persistence/startup is implemented; Discord interaction behavior starts in Milestone 1.
 
+Scope update, October 25: existing text/research/planning implementations are extended by [Voice Ray V0–V4](voice-ray-milestones.md). The sections below describe the text foundation; the voice extension below defines its additional transport and conversation behavior. Voice is planned, not yet implemented.
+
+## Voice extension
+
+Use one Discord voice channel linked to an existing planning text session, initially with two to four opted-in students. Preserve per-member Discord identity through ElevenLabs realtime transcription. A small voice controller sends relevant discussion as background context and addressed questions as turns to one ElevenLabs conversational agent. Client-tool events run allowlisted functions locally in the Node worker, wrapping existing research, notes, group planning and recap services. Stream the agent's audio back into Discord. V0 must prove that path, including interruption, before further voice work.
+
+The hosted agent handles friendly dialogue and tool selection; the existing backend remains responsible for evidence, author-owned profiles, permission checks and deterministic schedule decisions. This is a bounded adapter and presentation layer, not another autonomous research framework. Existing OpenRouter routing continues for backend tasks; the conversational agent's model is configured separately in ElevenLabs.
+
+Voice and text use the same canonical planning session and profiles. Store only bounded finalized utterances with known author/source IDs; batch preference extraction at useful checkpoints. Distinguish new discussion from changes to validated preferences so ordinary speech does not constantly invalidate planning. Tool context binds the room and current authorized speaker; model-supplied names or IDs do not establish identity. An explicit recommendation request refreshes pending profiles before taking its snapshot. Voice output uses structured assignments/evidence, with detailed links in text, rather than reading Discord formatting aloud.
+
+Interruptions stop local playback, clear queues and invalidate late audio/results. Separate Scribe transcription means the Discord controller must detect speech activity; the hosted agent's audio turn detector alone cannot stop playback. Audio sessions/queues are ephemeral and require manual rejoin after failure; persisted profiles survive through the existing store. Apply a voice-processing notice, explicit opt-in, pause/resume and leave controls. Automatic suggestions and simultaneous-human-speech reasoning are optional/deferred. The [voice checklist](voice-ray-milestones.md) provides exact scope, acceptance checks and cut rules.
+
 ## Product workflow
 
 1. Students use a private text channel in a Discord server with Ray installed. An ordinary Discord bot cannot join a group DM. See [Discord's bot account restrictions](https://docs.discord.com/developers/topics/oauth2#bot-vs-user-accounts).
