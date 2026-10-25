@@ -9,6 +9,10 @@ export const sectionSchema = z.object({
     start_date: z.string().nullable(),end_date: z.string().nullable(),status: z.enum(['scheduled','unknown'])})),
   timezone: z.string(), open_seats: z.number().int().nonnegative().nullable(), total_seats: z.number().int().nonnegative().nullable(),
   class_url: z.url().refine(value => new URL(value).origin === 'https://catalog.apps.asu.edu'),
+  units_min:z.union([z.string(),z.number()]).nullable().optional(),units_max:z.union([z.string(),z.number()]).nullable().optional(),
+  component:z.string().nullable().optional(),associated_class:z.union([z.string(),z.number()]).nullable().optional(),
+  linked_components:z.object({status:z.enum(['verified','unknown']),required_class_numbers:z.array(z.string().regex(/^\d+$/)).max(12),
+    source_url:z.url().refine(value=>new URL(value).origin==='https://catalog.apps.asu.edu')}).optional(),
   campus: z.string().nullable().optional(), session: z.string().nullable().optional(),
 });
 export const catalogSchema = z.object({

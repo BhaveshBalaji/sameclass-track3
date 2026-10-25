@@ -24,7 +24,7 @@ export class ResearchAgent implements CourseResearch {
     private pool?:pg.Pool,private observe:(data:ResearchDiagnostics)=>void=()=>{},private transport:typeof fetch=fetch){}
   async answer(question:string,activeTerm?:string,context:ResearchContext={turns:[]}):Promise<string>{
     const id=randomUUID(),started=Date.now(),observations:ModelObservation[]=[];
-    const signal=AbortSignal.timeout(this.config.RESEARCH_TOTAL_TIMEOUT_MS);
+    const signal=AbortSignal.any([AbortSignal.timeout(this.config.RESEARCH_TOTAL_TIMEOUT_MS),...(context.signal?[context.signal]:[])]);
     const budget:ResearchBudget={signal,tools:0,models:0,maxTools:this.config.RESEARCH_MAX_SOURCE_CALLS,maxModels:this.config.RESEARCH_MAX_MODEL_CALLS,refresh:false};
     let rounds=0,continueResearch=false;
     const attempted=new Set<string>(),completedTasks:ResearchTask[]=[];
@@ -59,7 +59,7 @@ export class ResearchAgent implements CourseResearch {
           +'An instructor name may be null: workers discover ALL listed instructors for that course and research them in parallel. Never ask the user to name an instructor when the catalog can supply them. Ask at most one short question for information that genuinely cannot be inferred. Class number may be null. '
           +'Use uppercase course subjects and numbers; semester as Spring/Summer/Fall YYYY. Set refresh true if the user asks for fresh/current/latest data. '
           +'Do not implement group schedule recommendations; explain that compatibility checking is not available yet.',
-          prompt:JSON.stringify({question:question.slice(0,4000),conversation:context.turns.map(t=>({question:t.question,answer:t.answer.replace(/https?:\/\/[^\s)]+/g,'[source]').slice(0,2000),tasks:t.tasks,instructors:t.instructors,syllabusCoverage:t.syllabusCoverage})),knownScope:knownScope(question,context,activeTerm),activeSemester:activeTerm?semesterName(activeTerm):null})});
+          prompt:JSON.stringify({question:question.slice(0,4000),conversation:context.turns.map(t=>({question:t.question,answer:t.answer.replace(/https?:\/\/[^\s)]+/g,'[source]').slice(0,2000),tasks:t.tasks,instructors:t.instructors,syllabusCoverage:t.syllabusCoverage})),offeringScope:context.offeringScope,knownScope:knownScope(question,context,activeTerm),activeSemester:activeTerm?semesterName(activeTerm):null})});
         usage(result.usage);plan=planSchema.parse(result.output);
         if(plan.tasks.length>this.config.RESEARCH_MAX_TASKS)plan.tasks=plan.tasks.slice(0,this.config.RESEARCH_MAX_TASKS);
         // A comparison with an already-known shortlist needs evidence, not another intake question.
@@ -84,7 +84,7 @@ export class ResearchAgent implements CourseResearch {
           try{
             const catalog=await this.sources.search(task,budget,signal);
             workers.push({taskId:`${id}:discover:${task.catalog}`,entity:catalog.entity,status:catalog.status==='ok'?'ok':'partial',evidence:[catalog],limitations:[]});
-            const names=[...new Set((catalog.data as {results:{instructors:{name:string}[]}[]}).results.flatMap(s=>s.instructors.map(i=>i.name.trim())).filter(Boolean))];
+            const names=[...new Set((catalog.data as {results:{instructors:{name:string}[]}[]}).results.flatMap(s=>s.instructors.map(i=>i.name.trim())).filter(Boolean))].filter(name=>!context.offeringScope||context.offeringScope.instructors.includes(name));
             return names.length?names.map(professor=>({...task,professor})):[];
           }catch(error){workers.push({taskId:`${id}:discover:${task.catalog}`,entity:task.catalog,status:'unavailable',evidence:[],limitations:[safeResearchError(error)]});return [];}
         }));
@@ -113,7 +113,7 @@ export class ResearchAgent implements CourseResearch {
         phase='assess';
         const evidence=[...new Map(workers.flatMap(w=>w.evidence).map(e=>[e.id,e])).values()];
         const names=[...new Set(evidence.filter(e=>e.kind==='catalog').flatMap(e=>(e.data as {results:{instructors:{name:string}[]}[]}).results.flatMap(s=>s.instructors.map(i=>i.name))))];
-        const extraContext:ResearchContext={turns:[...context.turns,{requestId:id,question,answer:'',tasks:completedTasks,instructors:names}]};
+        const extraContext:ResearchContext={offeringScope:context.offeringScope,turns:[...context.turns,{requestId:id,question,answer:'',tasks:completedTasks,instructors:names}]};
         try{
           const checked=await generateText({model,temperature:0,maxRetries:0,maxOutputTokens:1200,abortSignal:signal,
             output:Output.object({schema:planSchema}),system:safety+
@@ -202,11 +202,22 @@ export class ResearchAgent implements CourseResearch {
   private validatePlan(plan:ResearchPlan,question:string,activeTerm:string|undefined,context:ResearchContext){
     const scope=knownScope(question,context,activeTerm);
     const history=context.turns.map(t=>`${t.question} ${t.answer} ${t.tasks.map(k=>`${k.subject} ${k.catalog} ${k.semester} ${k.professor??''}`).join(' ')} ${t.instructors.join(' ')}`).join('\n');
-    const available=`${question}\n${history}`,compact=available.replace(/[^a-z0-9]/gi,'').toUpperCase();
+    const available=`${question}\n${history}\n${context.offeringScope?.instructors.join(' ')??''}`,compact=available.replace(/[^a-z0-9]/gi,'').toUpperCase();
     const explicitTerms=[...question.matchAll(/\b(?:(?:spring|summer|fall|autumn)\s+20\d{2}|20\d{2}\s+(?:spring|summer|fall|autumn))\b/gi)].map(m=>semesterCode(m[0]));
     const contextualTerms=[...history.matchAll(/\b(?:(?:spring|summer|fall|autumn)\s+20\d{2}|20\d{2}\s+(?:spring|summer|fall|autumn))\b/gi)].map(m=>semesterCode(m[0]));
     const structuredTerms=context.turns.flatMap(t=>t.tasks).filter(t=>t.semester).map(t=>semesterCode(t.semester));
     const allowed=explicitTerms.length?explicitTerms:[...new Set([...structuredTerms,...contextualTerms,...(activeTerm?[activeTerm]:[])])];
+    if(context.offeringScope){
+      const offering=context.offeringScope;
+      plan.tasks=plan.tasks.filter(task=>(!task.subject||task.subject===offering.subject)&&(!task.catalog||task.catalog===offering.catalog)
+        &&(!task.professor||offering.instructors.includes(task.professor)));
+      for(const task of plan.tasks){
+        task.subject=offering.subject;task.catalog=offering.catalog;task.semester=offering.semester;
+        if(offering.delivery)Object.assign(task,{delivery:offering.delivery});
+        if(task.kind==='syllabus')task.classNumber=offering.sectionId;
+        if(!task.professor&&offering.instructors.length===1)task.professor=offering.instructors[0]!;
+      }
+    }
     for(const task of plan.tasks){
       const inherit=task.kind!=='reviews'||task.subject||task.catalog||!task.professor||/\b[a-z]{2,5}\s*\d{3}/i.test(question)||context.turns.some(t=>t.instructors.includes(task.professor!));
       if(inherit){

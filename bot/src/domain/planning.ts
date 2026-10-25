@@ -1,14 +1,13 @@
 import { z } from 'zod';
 
 export class PlanningError extends Error { constructor(message: string) { super(message); this.name = 'PlanningError'; } }
-export const fieldSchema = z.enum(['approved_courses', 'credits', 'course_count', 'campus', 'unavailability',
-  'preferred_times', 'topics', 'assessment', 'flexibility', 'requirement']);
+export const fieldSchema = z.string().regex(/^[a-z][a-z0-9_]{0,59}$/).refine(key=>!['constructor','prototype','__proto__'].includes(key));
 export const factSchema = z.object({
   field: fieldSchema, strength: z.enum(['hard', 'soft', 'unrestricted']), values: z.array(z.string().min(1).max(250)).min(1).max(12),
   sources: z.array(z.object({ messageId: z.string(), quote: z.string().min(1).max(500) })).min(1).max(12),
 });
 export type Fact = z.infer<typeof factSchema>;
-export const patchSchema = z.object({ facts: z.array(factSchema).max(10) });
+export const patchSchema = z.object({ facts: z.array(factSchema).max(16) });
 export type Patch = z.infer<typeof patchSchema>;
 export type Field = z.infer<typeof fieldSchema>;
 export interface Profile { version: number; facts: Partial<Record<Field, Fact>> }
@@ -20,12 +19,13 @@ export interface PlanningSession {
   id: string; guildId: string; channelId: string; creatorId: string; term: string; version: number;
   participants: Record<string, Participant>; messages: PlanningMessage[]; nextOrdinal: number; truncated: boolean;
   clarifications: Clarification[]; currentRequest?: string;
+  lastRecommendation?: {inputVersion:number;sectionIds:string[];createdAt:string};
   resetConfirmation?: { actorId: string; token: string; expiresAt: number };
 }
 export interface Actor { userId: string; name: string; moderator?: boolean }
 export interface Room { guildId: string; channelId: string }
 export interface Incoming extends Room, Actor {
-  id: string; content: string; botMention: boolean; replyTo?: string; bot?: boolean; webhook?: boolean;
+  id: string; content: string; botMention: boolean; planCommand?:boolean; replyTo?: string; bot?: boolean; webhook?: boolean;
 }
 export interface Outgoing {
   id: string; text: string; mentions: string[]; clarificationIds: string[];
@@ -41,8 +41,10 @@ export function clean(value: string): string {
   return value.replace(/@/g, '@\u200b').replace(/[<>`*_\\]/g, '\\$&');
 }
 export function validatePatch(patch: Patch, input: ExtractionInput): void {
-  const seen = new Set<string>();
+  const seen = new Set<string>(), added=new Set<string>();
   for (const fact of patchSchema.parse(patch).facts) {
+    if(!Object.hasOwn(input.profile.facts,fact.field))added.add(fact.field);
+    if(Object.keys(input.profile.facts).length+added.size>40)throw new Error('Profile fact limit reached.');
     if (seen.has(fact.field)) throw new Error('Duplicate preference field.');
     seen.add(fact.field);
     for (const source of fact.sources) {

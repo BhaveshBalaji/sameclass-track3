@@ -18,7 +18,9 @@
     "test:planning": "tsx --test tests/planning.test.ts",
     "replay": "tsx scripts/replay.ts",
     "register:commands": "tsx scripts/register-commands.ts",
-    "check:research": "tsx scripts/check-research.ts"
+    "check:research": "tsx scripts/check-research.ts",
+    "test:group": "tsx --test tests/group-planning.test.ts",
+    "check:planning": "tsx scripts/check-planning.ts"
   },
   "dependencies": {
     "@langchain/langgraph": "1.5.2",

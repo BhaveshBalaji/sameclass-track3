@@ -62,6 +62,7 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
         } else if (interaction.commandName === 'plan') {
           switch (interaction.options.getSubcommand()) {
             case 'start': await app.start(room,interaction.id,actor,interaction.options.getString('semester',true)); break;
+            case 'recommend': await app.recommend(room,interaction.id,actor); break;
             case 'status': await app.status(room,interaction.id); break;
             case 'profile': await app.profile(room,interaction.id,actor); break;
             case 'reset-profile': await app.resetProfile(room,interaction.id,actor); break;

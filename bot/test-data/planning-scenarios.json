@@ -1,0 +1,12 @@
+{
+  "note": "Synthetic M4 scenario matrix; never used as a fallback for live catalog data.",
+  "scenarios": [
+    {"id":"shared-with-silent-fourth","expect":"CSE 512 afternoon fits three supplied profiles; fourth remains unknown"},
+    {"id":"no-shared-match","expect":"Keep hard restrictions; show individual alternatives"},
+    {"id":"required-lab-conflict","expect":"A fitting lecture plus conflicting required lab is rejected for that student"},
+    {"id":"unknown-linked-rules","expect":"Preliminary only; never call it a verified backup"},
+    {"id":"correction-during-source-failure","expect":"Keep other source successes; old snapshot cannot overwrite newer constraints"},
+    {"id":"membership-reset-isolation","expect":"Leave/reset invalidate old work and sessions remain isolated"},
+    {"id":"flexible-profile-and-own-correction","expect":"Retain custom planning facts with author-owned evidence"}
+  ]
+}

@@ -8,6 +8,7 @@ export const commandDefinitions = [
   new SlashCommandBuilder().setName('plan').setDescription('Manage a shared class-planning session.')
     .addSubcommand(c => c.setName('start').setDescription('Create a planning workspace in this channel.')
       .addStringOption(o => o.setName('semester').setDescription('Semester, e.g. Spring 2027').setRequired(true).setAutocomplete(true).setMaxLength(40)))
+    .addSubcommand(c => c.setName('recommend').setDescription('Find shared options using the joined students’ profiles.'))
     .addSubcommand(c => c.setName('status').setDescription('Show current participants and saved preferences.'))
     .addSubcommand(c => c.setName('profile').setDescription('Show your stored planning preferences.'))
     .addSubcommand(c => c.setName('reset-profile').setDescription('Remove your stored profile and source messages.'))

@@ -42,9 +42,9 @@ export class ResearchSources {
       status,retrievedAt:at,retrievedAtLocal:new Date(at).toLocaleString('en-US',{timeZone:'America/Phoenix',timeZoneName:'short'}),sources,data,limitations,...meta};
   }
   async search(task:ResearchTask,budget:ResearchBudget,signal:AbortSignal):Promise<Evidence> {
-    const term=semesterCode(task.semester),key=`catalog:${term}:${task.subject}:${task.catalog}`;
+    const term=semesterCode(task.semester),key=`catalog:${term}:${task.subject}:${task.catalog}${task.delivery==='O'?':O':''}`;
     const result=await this.read(key,'asu',this.seatsTtl,budget,signal,()=>this.asu.get('/api/search',catalogSchema,
-      {term,subject:task.subject,catalog_nbr:task.catalog,search_type:'all',max_pages:'2'},signal));
+      {term,subject:task.subject,catalog_nbr:task.catalog,search_type:'all',max_pages:'2',campus_or_online_selection:task.delivery??'A'},signal));
     const data=result.value;
     if(data.count!==data.results.length||data.results.some(s=>s.term!==term||s.subject!==task.subject||s.catalog_nbr!==task.catalog))throw new APIError('invalid_response');
     const limited=data.results.length>this.candidates,limitations=[];

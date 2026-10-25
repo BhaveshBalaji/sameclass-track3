@@ -1,3 +1,6 @@
+import {isGroupRequest} from '../planning/engine.js';
+import type {GroupPlanner} from '../planning/types.js';
+import {roomId} from '../persistence/planning-store.js';
 import { ResearchMemory } from '../persistence/research-context.js';
 import type { ResearchContext } from '../research/types.js';
 import { semesterCode, semesterName } from '../domain/semester.js';
@@ -8,7 +11,7 @@ import { z } from 'zod';
 import { createCheckpointer } from '../persistence/database.js';
 import { PlanningStore, response } from '../persistence/planning-store.js';
 import { PlanningError, clean, missingQuestion, validatePatch, type Actor, type Incoming, type LanguageService,
-  type Outgoing, type Participant, type PlanningSession, type Room, type Patch } from '../domain/planning.js';
+  type Outgoing, type Fact, type Participant, type PlanningSession, type Room, type Patch } from '../domain/planning.js';
 
 export const processingNotice = 'Ray sends planning messages posted after you join to OpenRouter to understand your preferences. '
   + 'Join to include your messages; leave to stop.';
@@ -19,7 +22,7 @@ function requireSession(state: PlanningSession | null): PlanningSession {
 function summary(session: PlanningSession): string {
   const people = Object.values(session.participants).filter(p => p.active);
   const sections = people.map(person => {
-    const facts = Object.values(person.profile.facts);
+    const facts = Object.values(person.profile.facts).filter((f):f is Fact=>Boolean(f));
     return `${clean(person.name)}${facts.length ? '' : ' — preferences unknown'}\n`
       + facts.map(f => `• ${f.field.replace(/_/g,' ')} [${f.strength}]: ${clean(f.values.join('; ').slice(0,300))}`).join('\n');
   });
@@ -27,10 +30,22 @@ function summary(session: PlanningSession): string {
     + (session.truncated ? 'Older conversation context was truncated; saved profile facts are retained.\n' : '')
     + 'Mention me with a course to check its instructors, meeting times and seats.';
 }
+function attachQuestions(state:PlanningSession,body:Outgoing){
+  for(const person of Object.values(state.participants).filter(p=>p.active)){
+    if(state.clarifications.some(q=>q.userId===person.userId&&q.state==='pending'))continue;
+    const missing=missingQuestion(person);if(!missing)continue;
+    const q={id:randomUUID(),userId:person.userId,...missing,state:'pending' as const,responseId:body.id,messageIds:[]};
+    state.clarifications.push(q);if(missing.field==='participation')person.silenceAsked=true;
+    body.clarificationIds.push(q.id);body.mentions.push(person.userId);
+    body.text+=`\n\n**${clean(person.name)}:** ${missing.question} Reply directly to answer.`;
+  }
+}
 export class PlanningApplication {
   constructor(readonly store: PlanningStore, private language: LanguageService,
     private limits = { messages: 100, characters: 30000, participants: 12 },
-    private research?: CourseResearch) {}
+    private research?: CourseResearch,private groupPlanner?:GroupPlanner) {}
+  private activePlans=new Map<string,AbortController>();
+  private cancelPlan(room:Room){this.activePlans.get(roomId(room))?.abort();this.activePlans.delete(roomId(room));}
   get memory(){return new ResearchMemory(this.store.pool,this.store.namespace);}
   async start(room: Room, eventId: string, actor: Actor, term: string): Promise<void> {
     term = semesterCode(term);
@@ -58,7 +73,7 @@ export class PlanningApplication {
         if (existing) { existing.active = false; existing.cursor = state.nextOrdinal; }
         state.clarifications = state.clarifications.filter(q => q.userId !== actor.userId);
       }
-      state.version++; delete state.currentRequest;
+      this.cancelPlan(room);state.version++; delete state.currentRequest;
       await tx.enqueue(response(join ? 'You joined planning.' : 'You have left planning; your future messages will not be included.',[actor.userId]));
     });
   }
@@ -83,7 +98,7 @@ export class PlanningApplication {
       person.cursor = state.nextOrdinal; person.silenceAsked = false;
       state.messages = state.messages.filter(m => m.authorId !== actor.userId);
       state.clarifications = state.clarifications.filter(q => q.userId !== actor.userId);
-      state.version++; delete state.currentRequest;
+      this.cancelPlan(room);state.version++; delete state.currentRequest;
       // Erase retained generated summaries which could contain the removed facts.
       await this.store.eraseResponses(tx,state.id);
       await tx.enqueue(response('Your stored profile and retained source messages have been reset.',[actor.userId]));
@@ -105,12 +120,13 @@ export class PlanningApplication {
       const state = requireSession(tx.state), confirmation = state.resetConfirmation;
       if (state.id !== sessionId || confirmation?.token !== token || confirmation.actorId !== actor.userId
           || confirmation.expiresAt < Date.now() || (state.creatorId !== actor.userId && !actor.moderator)) throw new PlanningError('Reset confirmation is invalid, expired or belongs to another student.');
-      await this.store.eraseResponses(tx,state.id); tx.state = null;
+      this.cancelPlan(room);await this.store.eraseResponses(tx,state.id); tx.state = null;
       await tx.enqueue(response('Session reset. Use /plan start to begin a new session.'));
     });
     await this.memory.clear(room);
   }
   async ask(room: Room, eventId: string, actor: Actor, question: string, replyTo?:string, contextReplyTo?:string): Promise<void> {
+    if(isGroupRequest(question)){await this.message({...room,...actor,id:eventId,content:question,botMention:true});return;}
     const claimed = await this.store.transact(room,eventId,async tx => ({ term:tx.state?.term }));
     if (claimed.duplicate) return;
     const prior=await this.memory.begin(room,actor.userId,contextReplyTo);
@@ -132,7 +148,7 @@ export class PlanningApplication {
       const session = await this.store.read(event);
       const direct = session?.clarifications.some(q => q.state === 'pending' && q.userId === event.userId && q.messageIds.includes(event.replyTo ?? ''));
       const researchReply=event.replyTo?await this.memory.referenced(event,event.replyTo):null;
-      if (!direct && (researchReply || (event.botMention && (isCourseQuestion(event.content) || !session)))) {
+      if (!isGroupRequest(event.content) && !direct && (researchReply || (event.botMention && (isCourseQuestion(event.content) || !session)))) {
         await this.ask(event,event.id,event,event.content,event.id,event.replyTo); return;
       }
     }
@@ -141,6 +157,7 @@ export class PlanningApplication {
       const pending = state?.clarifications.find(q => q.state === 'pending' && q.userId === event.userId && q.messageIds.includes(event.replyTo ?? ''));
       if (!participant?.active && !event.botMention) return;
       if (participant?.active && state) {
+        this.cancelPlan(event);
         state.messages.push({ id: event.id, authorId: event.userId, content: event.content.slice(0,4000), ordinal: ++state.nextOrdinal });
         while (state.messages.length > this.limits.messages || state.messages.reduce((n,m) => n+m.content.length,0) > this.limits.characters) {
           state.messages.shift(); state.truncated = true;
@@ -159,7 +176,8 @@ export class PlanningApplication {
     const graphState = new StateSchema({ requestId: z.string(), status: z.string() });
     const graph = new StateGraph(graphState)
       .addNode('classify',async () => {
-        intent = work.pendingId ? 'profile_update' : await this.language.classify(event.content);
+        intent = work.pendingId ? 'profile_update' : event.planCommand?'group_planning':await this.language.classify(event.content);
+        if(!work.pendingId&&isGroupRequest(event.content))intent='group_planning';
         return { status: 'classified' };
       })
       .addNode('extract',async () => {
@@ -185,7 +203,7 @@ export class PlanningApplication {
     catch { modelFailed = true; }
     const courseAnswer = !modelFailed && (intent as string) === 'course_question'
       ? await this.answerCourse(event.content,work.snapshot.term) : undefined;
-    await this.store.transact(event,`finish:${work.requestId}`,async tx => {
+    const prepared=await this.store.transact(event,`finish:${work.requestId}`,async tx => {
       const enqueue = tx.enqueue;
       tx.enqueue = (body,guarded) => enqueue({...body,requestId:event.id,replyTo:event.id},guarded);
       const state = tx.state;
@@ -199,7 +217,7 @@ export class PlanningApplication {
         const message = state.messages.find(m => m.id === event.id); if (message) message.ignored = true;
         await tx.enqueue(response(courseAnswer ?? 'Please include a course and semester.',[event.userId])); return;
       }
-      if (!work.participant) { await tx.enqueue(response('Join planning before requesting a group preference summary. You can use /ask without joining.',[event.userId])); return; }
+      if (!work.participant) { await tx.enqueue(response('Join planning before requesting group recommendations. You can still use /ask for individual course questions.',[event.userId])); return; }
       for (const item of patches) {
         const person = state.participants[item.userId];
         if (!person?.active) continue;
@@ -220,15 +238,35 @@ export class PlanningApplication {
       state.version++;
       const body = response(summary(state),[event.userId]);
       if (failed.length) body.text += `\nSome profiles could not be validated: ${failed.map(id => clean(state.participants[id]?.name ?? id)).join(', ')}. Their previous facts were retained.`;
-      for (const person of Object.values(state.participants).filter(p => p.active)) {
-        if (state.clarifications.some(q => q.userId === person.userId && q.state === 'pending')) continue;
-        const missing = missingQuestion(person); if (!missing) continue;
-        const question = { id: randomUUID(), userId: person.userId, ...missing, state: 'pending' as const, responseId: body.id, messageIds: [] };
-        state.clarifications.push(question); if (missing.field === 'participation') person.silenceAsked = true;
-        body.clarificationIds.push(question.id); body.mentions.push(person.userId);
-        body.text += `\n\n${clean(person.name)}: ${missing.question} Reply directly to this message; no new mention is needed.`;
-      }
+      const shouldRecommend=Boolean(this.groupPlanner)&&(intent==='group_planning'||Boolean(state.lastRecommendation));
+      if(!shouldRecommend)attachQuestions(state,body);
+      if(shouldRecommend){state.currentRequest=work.requestId;return {snapshot:structuredClone(state),body};}
       await tx.enqueue(body,true);
     });
+    if(prepared.value&&this.groupPlanner){
+      const {snapshot,body}=prepared.value;
+      const controller=new AbortController();this.cancelPlan(event);this.activePlans.set(roomId(event),controller);
+      let recommendation;
+      try{recommendation=await this.groupPlanner.recommend(snapshot,event.content,controller.signal);}
+      catch{recommendation={text:'I couldn’t complete group research. Your profiles are saved; use /plan recommend to retry.',sectionIds:[]};}
+      finally{if(this.activePlans.get(roomId(event))===controller)this.activePlans.delete(roomId(event));}
+      await this.store.transact(event,`recommend:${work.requestId}`,async tx=>{
+        const state=tx.state;
+        if(!state||state.id!==snapshot.id)return;
+        if(state.version!==snapshot.version||state.currentRequest!==work.requestId){
+          await tx.enqueue({...response('Preferences or membership changed while I was planning. Use /plan recommend for an updated result.',[event.userId]),requestId:event.id,replyTo:event.id});return;
+        }
+        delete state.currentRequest;
+        state.lastRecommendation={inputVersion:snapshot.version,sectionIds:recommendation.sectionIds,createdAt:new Date().toISOString()};
+        body.text=recommendation.text;
+        if(failed.length)body.text+='\nSome profiles could not be updated; their prior facts were retained.';
+        attachQuestions(state,body);
+        body.requestId=event.id;body.replyTo=event.id;
+        await tx.enqueue(body,true);
+      });
+    }
+  }
+  async recommend(room:Room,eventId:string,actor:Actor):Promise<void>{
+    await this.message({...room,...actor,id:eventId,content:'Find shared classes for our group that we can take together.',botMention:true,planCommand:true});
   }
 }
