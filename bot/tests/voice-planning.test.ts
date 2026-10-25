@@ -88,3 +88,29 @@ test('cancelled voice admission cannot retain a source after reset',async()=>{
   const state=(await store.read(room))!;
   assert.equal(state.messages.length,0);assert.deepEqual(state.participants[alice.userId]!.profile.facts,{});
 });
+
+test('voice guests can retain notes and ask courses before planning, then enroll without losing their profile',async()=>{
+  const namespace=`test:voice:${crypto.randomUUID()}`;namespaces.push(namespace);
+  let researchTerm:string|undefined='unexpected';
+  const store=new PlanningStore(pool,namespace),app=new PlanningApplication(store,language,undefined,{answer:async(_q,term)=>{researchTerm=term;return 'Synthetic course answer';}});
+  const guest=await app.voiceParticipant(room,alice),signal=new AbortController().signal;
+  assert.equal(guest.voiceOnly,true);assert.equal(guest.participants[alice.userId]!.active,false);
+  await app.voiceIntake(room,guest.id,alice,'voice:guest','I work Tuesdays.');
+  const notes=await app.voiceNotes(room,guest.id,alice,signal) as {semester:string;facts:unknown[]};
+  assert.equal(notes.semester,'semester not selected');assert.equal(notes.facts.length,1);
+  assert.equal(await app.voiceQuestion(room,guest.id,alice,'What is CSE 445?',signal),'Synthetic course answer');
+  assert.equal(researchTerm,undefined);
+  assert.equal((await app.voiceRecommend(room,guest.id,alice,signal) as {planningRequired:boolean}).planningRequired,true);
+  await assert.rejects(()=>app.membership(room,'premature',alice,guest.id,true),/semester/);
+  await app.start(room,'promote',alice,'Spring 2027');
+  assert.equal((await store.read(room))!.id,guest.id);
+  assert.equal((await store.read(room))!.participants[alice.userId]!.active,false);
+  await app.membership(room,'enroll',alice,guest.id,true);
+  assert.deepEqual((await store.read(room))!.participants[alice.userId]!.profile.facts.unavailability!.values,['I work Tuesdays.']);
+  await app.voiceIntake(room,guest.id,alice,'voice:correction','I work Thursdays.');
+  await app.membership(room,'leave-planning',alice,guest.id,false);
+  await app.voiceNotes(room,guest.id,alice,signal);
+  assert.deepEqual((await store.read(room))!.participants[alice.userId]!.profile.facts.unavailability!.values,['I work Thursdays.']);
+  await app.resetProfile(room,'guest-reset',alice);
+  assert.deepEqual((await store.read(room))!.participants[alice.userId]!.profile.facts,{});
+});

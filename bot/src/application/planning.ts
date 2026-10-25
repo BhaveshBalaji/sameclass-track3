@@ -20,13 +20,13 @@ function requireSession(state: PlanningSession | null): PlanningSession {
   return state;
 }
 function summary(session: PlanningSession,own=false): string {
-  const people = Object.values(session.participants).filter(p => p.active);
+  const people = Object.values(session.participants).filter(p => p.active || own);
   const sections = people.map(person => {
     const facts = Object.values(person.profile.facts).filter((f):f is Fact=>Boolean(f));
     return `${clean(person.name)}${facts.length ? '' : ' — preferences unknown'}\n`
       + facts.map(f => `• ${f.field.replace(/_/g,' ')} [${f.strength}]: ${clean(f.values.join('; ').slice(0,300))}`).join('\n');
   });
-  return `${own?'Your planning profile':'Planning'} ${semesterName(session.term)}${own?'':` · ${people.length} joined`}\n\n${sections.join('\n\n')}\n\n`
+  return `${own?'Your planning profile':'Planning'} ${(session.term?semesterName(session.term):'semester not selected')}${own?'':` · ${people.length} joined`}\n\n${sections.join('\n\n')}\n\n`
     + (session.truncated ? 'Older conversation context was truncated; saved profile facts are retained.\n' : '')
     + 'Mention me with a course to check its instructors, meeting times and seats.';
 }
@@ -53,8 +53,9 @@ export class PlanningApplication {
   async start(room: Room, eventId: string, actor: Actor, term: string): Promise<void> {
     term = semesterCode(term);
     await this.store.transact(room,eventId,async tx => {
-      if (tx.state) throw new PlanningError('A session is already active in this channel.');
-      tx.state = { id: randomUUID(), guildId: room.guildId, channelId: room.channelId, creatorId: actor.userId,
+      if (tx.state && !tx.state.voiceOnly) throw new PlanningError('A session is already active in this channel.');
+      if(tx.state){tx.state.voiceOnly=false;tx.state.term=term;tx.state.version++;}
+      tx.state ??= { id: randomUUID(), guildId: room.guildId, channelId: room.channelId, creatorId: actor.userId,
         term, version: 1, participants: {}, messages: [], nextOrdinal: 0, truncated: false, clarifications: [] };
       const body = response(`Planning for ${semesterName(term)}. ${processingNotice}`);
       body.buttons = ['join','leave'].map(action => ({ label: action === 'join' ? 'Join planning' : 'Leave planning',
@@ -62,10 +63,27 @@ export class PlanningApplication {
       await tx.enqueue(body);
     });
   }
+  async voiceParticipant(room:Room,actor:Actor):Promise<PlanningSession>{
+    const result=await this.store.transact(room,`voice-join:${randomUUID()}`,async tx=>{
+      tx.state??={id:randomUUID(),...room,creatorId:actor.userId,term:'',voiceOnly:true,version:1,
+        participants:{},messages:[],nextOrdinal:0,truncated:false,clarifications:[]};
+      const state=tx.state;
+      if(!state.participants[actor.userId]){
+        if(Object.keys(state.participants).length>=this.limits.participants)throw new PlanningError('This voice workspace is full.');
+        state.participants[actor.userId]={...actor,active:false,profile:{version:0,facts:{}},silenceAsked:false,cursor:state.nextOrdinal};
+        state.version++;
+      }
+      state.participants[actor.userId]!.name=actor.name;
+      state.participants[actor.userId]!.voice=true;
+      return structuredClone(state);
+    });
+    return result.value!;
+  }
   async membership(room: Room, eventId: string, actor: Actor, sessionId: string, join: boolean): Promise<void> {
     await this.store.transact(room,eventId,async tx => {
       const state = requireSession(tx.state);
       if (state.id !== sessionId) throw new PlanningError('This planning button belongs to an old session.');
+      if(join&&state.voiceOnly)throw new PlanningError('Choose a semester with /plan start before joining planning.');
       const existing = state.participants[actor.userId];
       if (join) {
         if (!existing?.active && Object.values(state.participants).filter(p => p.active).length >= this.limits.participants) throw new PlanningError(`This session supports up to ${this.limits.participants} participants.`);
@@ -73,7 +91,7 @@ export class PlanningApplication {
         state.participants[actor.userId] = existing ? { ...existing, active: true, name: actor.name } : {
           userId: actor.userId, name: actor.name, active: true, profile: { version: 0, facts: {} }, silenceAsked: false, cursor: state.nextOrdinal };
       } else {
-        if (existing) { existing.active = false; existing.cursor = state.nextOrdinal; }
+        if (existing) { existing.active = false; if(!existing.voice)existing.cursor = state.nextOrdinal; }
         state.clarifications = state.clarifications.filter(q => q.userId !== actor.userId);
       }
       this.cancelPlan(room);state.version++; delete state.currentRequest;
@@ -88,7 +106,7 @@ export class PlanningApplication {
   async profile(room: Room, eventId: string, actor: Actor): Promise<void> {
     await this.store.transact(room,eventId,async tx => {
       const state = requireSession(tx.state), person = state.participants[actor.userId];
-      if (!person?.active) throw new PlanningError('Join planning first to view your stored profile.');
+      if (!person) throw new PlanningError('Join planning or voice first to view your stored profile.');
       const own = structuredClone(state); own.participants = { [person.userId]: person };
       await tx.enqueue(response(summary(own,true),[actor.userId]),true);
     });
@@ -96,7 +114,7 @@ export class PlanningApplication {
   async resetProfile(room: Room, eventId: string, actor: Actor): Promise<void> {
     await this.store.transact(room,eventId,async tx => {
       const state = requireSession(tx.state), person = state.participants[actor.userId];
-      if (!person?.active) throw new PlanningError('Join planning first.');
+      if (!person) throw new PlanningError('Join planning or voice first.');
       person.profile = { version: person.profile.version + 1, facts: {} };
       person.cursor = state.nextOrdinal; person.silenceAsked = false;
       state.messages = state.messages.filter(m => m.authorId !== actor.userId);
@@ -148,20 +166,20 @@ export class PlanningApplication {
   /** Voice tools share research memory and delivery, with server-bound actor/session context. */
   async voiceQuestion(room:Room,sessionId:string,actor:Actor,question:string,signal:AbortSignal):Promise<string>{
     const state=await this.store.read(room);
-    if(state?.id!==sessionId||!state.participants[actor.userId]?.active)throw new PlanningError('Voice planning membership expired.');
+    if(state?.id!==sessionId||!state.participants[actor.userId])throw new PlanningError('Voice planning membership expired.');
     const profileVersion=state.participants[actor.userId]!.profile.version;
     signal.throwIfAborted();
     const requestId=`voice:${randomUUID()}`,prior=await this.memory.begin(room,actor.userId);
     const context:ResearchContext={turns:prior.turns,signal};
-    const answer=await this.answerCourse(question,state.term,context);
+    const answer=await this.answerCourse(question,state.term||undefined,context);
     signal.throwIfAborted();
     const current=await this.store.read(room);
-    if(current?.id!==sessionId||!current.participants[actor.userId]?.active||current.participants[actor.userId]!.profile.version!==profileVersion)throw new PlanningError('Voice planning context changed.');
+    if(current?.id!==sessionId||!current.participants[actor.userId]||current.participants[actor.userId]!.profile.version!==profileVersion)throw new PlanningError('Voice planning context changed.');
     await this.memory.finish(room,actor.userId,prior.version,prior.turns,{requestId,question:question.slice(0,2000),answer:answer.slice(0,4000),
       tasks:context.result?.tasks??[],instructors:context.result?.instructors??[],sources:context.result?.sources??[],syllabusCoverage:context.result?.syllabusCoverage});
     await this.store.transact(room,`answer:${requestId}`,async tx=>{
       signal.throwIfAborted();
-      if(tx.state?.id!==sessionId||!tx.state.participants[actor.userId]?.active||tx.state.participants[actor.userId]!.profile.version!==profileVersion)throw new PlanningError('Voice planning context changed.');
+      if(tx.state?.id!==sessionId||!tx.state.participants[actor.userId]||tx.state.participants[actor.userId]!.profile.version!==profileVersion)throw new PlanningError('Voice planning context changed.');
       await tx.enqueue({...response(answer,[actor.userId]),requestId});
     });
     return answer;
@@ -170,7 +188,7 @@ export class PlanningApplication {
     await this.store.transact(room,sourceId,async tx=>{
       signal?.throwIfAborted();
       const state=tx.state;
-      if(state?.id!==sessionId||!state.participants[actor.userId]?.active)return;
+      if(state?.id!==sessionId||!state.participants[actor.userId])return;
       const content=text.trim().slice(0,4000);
       if(!content)return;
       // Speech is pending evidence, not an immediate change to validated preferences.
@@ -181,9 +199,9 @@ export class PlanningApplication {
   }
   private async voiceRefresh(room:Room,sessionId:string,actor:Actor,signal:AbortSignal,all=false):Promise<PlanningSession>{
     const snapshot=await this.store.read(room);
-    if(snapshot?.id!==sessionId||!snapshot.participants[actor.userId]?.active)throw new PlanningError('Voice planning membership expired.');
+    if(snapshot?.id!==sessionId||!snapshot.participants[actor.userId])throw new PlanningError('Voice planning membership expired.');
     const patches:{userId:string;patch:Patch;cursor:number}[]=[];
-    for(const person of Object.values(snapshot.participants).filter(p=>p.active&&(all||p.userId===actor.userId))){
+    for(const person of Object.values(snapshot.participants).filter(p=>(p.active||p.voice||p.userId===actor.userId)&&(all||p.userId===actor.userId))){
       signal.throwIfAborted();
       const messages=snapshot.messages.filter(m=>m.authorId===person.userId&&m.ordinal>person.cursor&&!m.ignored);
       if(!messages.length)continue;
@@ -194,7 +212,7 @@ export class PlanningApplication {
     signal.throwIfAborted();
     const applied=await this.store.transact(room,`voice-refresh:${randomUUID()}`,async tx=>{
       signal.throwIfAborted();const state=tx.state;
-      if(state?.id!==sessionId||state.version!==snapshot.version||state.nextOrdinal!==snapshot.nextOrdinal||!state.participants[actor.userId]?.active)throw new PlanningError('Preferences changed while reading notes. Ask Ray again.');
+      if(state?.id!==sessionId||state.version!==snapshot.version||state.nextOrdinal!==snapshot.nextOrdinal||!state.participants[actor.userId])throw new PlanningError('Preferences changed while reading notes. Ask Ray again.');
       let changed=false;
       for(const item of patches){
         const person=state.participants[item.userId]!;
@@ -215,10 +233,13 @@ export class PlanningApplication {
   async voiceNotes(room:Room,sessionId:string,actor:Actor,signal:AbortSignal):Promise<unknown>{
     const state=await this.voiceRefresh(room,sessionId,actor,signal);
     const person=state.participants[actor.userId]!;
-    return {name:person.name,semester:semesterName(state.term),facts:Object.values(person.profile.facts).filter((f):f is Fact=>Boolean(f)).map(f=>({field:f.field,strength:f.strength,values:f.values})),
+    return {name:person.name,semester:(state.term?semesterName(state.term):'semester not selected'),facts:Object.values(person.profile.facts).filter((f):f is Fact=>Boolean(f)).map(f=>({field:f.field,strength:f.strength,values:f.values})),
       instruction:'Read only this member’s saved needs. Unknown fields stay unknown. Do not imply a recommendation was accepted.'};
   }
   async voiceRecommend(room:Room,sessionId:string,actor:Actor,signal:AbortSignal):Promise<unknown>{
+    const enrollment=await this.store.read(room);
+    if(enrollment?.id!==sessionId||!enrollment.participants[actor.userId])throw new PlanningError('Voice workspace expired.');
+    if(!enrollment.term||!enrollment.participants[actor.userId]?.active) return {planningRequired:true,instruction:enrollment.term?'Invite the speaker to click Join planning in this text channel before requesting group recommendations. Basic questions and voice notes remain available.':'Invite the speaker to start planning with /plan start and choose a semester, then click Join planning in this text channel. Basic questions and voice notes remain available.'};
     if(!this.groupPlanner)throw new PlanningError('Group planning is unavailable.');
     const snapshot=await this.voiceRefresh(room,sessionId,actor,signal,true);
     const requestId=`voice-plan:${randomUUID()}`;
@@ -232,27 +253,28 @@ export class PlanningApplication {
         inlineMentions:result.inlineMentions?.filter(m=>state.participants[m.userId]?.active)};
       await tx.enqueue(body,true);
     });
-    return {semester:semesterName(snapshot.term),members:Object.values(snapshot.participants).filter(p=>p.active).map(p=>({name:p.name,
+    return {semester:(snapshot.term?semesterName(snapshot.term):'semester not selected'),members:Object.values(snapshot.participants).filter(p=>p.active).map(p=>({name:p.name,
       assignedSectionIds:result.assignments?.find(a=>a.userId===p.userId)?.sectionIds??[],requested:result.assignments?.find(a=>a.userId===p.userId)?.requested??null})),
+      notEnrolled:Object.values(snapshot.participants).filter(p=>p.voice&&!p.active).map(p=>p.name),
       presentation:result.spoken??'Structured spoken recommendation details are unavailable. Refer to the detailed plan posted in text; do not invent courses from section IDs.',
-      instruction:'Address each member by name, then summarize shared options. Preserve preliminary and missing-data qualifications. This is a proposal, not consensus.'};
+      instruction:'Only enrolled members are included. Invite anyone listed in notEnrolled to Join planning before including them. Address each enrolled member by name, then summarize shared options. Preserve preliminary and missing-data qualifications. This is a proposal, not consensus.'};
   }
   async voiceRecap(room:Room,sessionId:string,actor:Actor,signal:AbortSignal):Promise<unknown>{
     const snapshot=await this.voiceRefresh(room,sessionId,actor,signal,true);
-    const members=Object.values(snapshot.participants).filter(p=>p.active).map(p=>({name:p.name,
+    const members=Object.values(snapshot.participants).filter(p=>p.active||p.voice).map(p=>({name:p.name,
       facts:Object.values(p.profile.facts).filter((f):f is Fact=>Boolean(f)).map(f=>({field:f.field,strength:f.strength,values:f.values}))}));
     const plan=snapshot.lastRecommendation;
     const latestPlan=plan?{sectionIds:plan.sectionIds,current:plan.inputVersion===snapshot.version}:null;
     const lines=members.map(p=>`${clean(p.name)}: ${p.facts.length?p.facts.map(f=>`${f.field.replace(/_/g,' ')} (${f.strength}): ${clean(f.values.join('; '))}`).join('; '):'preferences unknown'}`);
-    const text=`**Voice session recap · ${semesterName(snapshot.term)}**\n\n${lines.join('\n\n')}\n\n`
+    const text=`**Voice session recap · ${(snapshot.term?semesterName(snapshot.term):'semester not selected')}**\n\n${lines.join('\n\n')}\n\n`
       +(latestPlan?`Latest proposed section IDs: ${latestPlan.sectionIds.join(', ')||'none'}.${latestPlan.current?'':' Preferences changed since that plan; request an update.'}`:'No recommendation has been generated yet.')
       +'\nThis records saved needs and proposals; no group acceptance is implied. Degree/prerequisite eligibility and missing requirements remain unchecked.';
     await this.store.transact(room,`voice-recap:${randomUUID()}`,async tx=>{
       signal.throwIfAborted();
-      if(tx.state?.id!==sessionId||tx.state.version!==snapshot.version||!tx.state.participants[actor.userId]?.active)throw new PlanningError('Session changed. Request a new recap.');
+      if(tx.state?.id!==sessionId||tx.state.version!==snapshot.version||!tx.state.participants[actor.userId])throw new PlanningError('Session changed. Request a new recap.');
       await tx.enqueue(response(text),true);
     });
-    return {semester:semesterName(snapshot.term),members,latestPlan,instruction:'Briefly recap saved needs and unresolved unknowns. Do not read section IDs aloud or claim the group accepted a plan. Refer to the detailed proposed plan in text.'};
+    return {semester:(snapshot.term?semesterName(snapshot.term):'semester not selected'),members,latestPlan,instruction:'Briefly recap saved needs and unresolved unknowns. Do not read section IDs aloud or claim the group accepted a plan. Refer to the detailed proposed plan in text.'};
   }
   async message(event: Incoming): Promise<void> {
     if (event.bot || event.webhook) return;

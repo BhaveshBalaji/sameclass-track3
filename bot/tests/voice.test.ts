@@ -6,7 +6,7 @@ import type WebSocket from 'ws';
 import { parseConfig } from '../src/config/index.js';
 import { discordPCM, SpeechDecoder,SpeechActivityGate } from '../src/voice/audio.js';
 import { ElevenAgent, ScribeUtterance, type AgentCallbacks } from '../src/voice/elevenlabs.js';
-import { VoiceSession, type ConversationalConnection } from '../src/voice/session.js';
+import { addressesRay, VoiceSession, type ConversationalConnection } from '../src/voice/session.js';
 import { PlanningVoiceBackend } from '../src/application/voice.js';
 import type { PlanningApplication } from '../src/application/planning.js';
 import { commandDefinitions,discordSettings,voiceCommandAllowed } from '../src/transport/discord/commands.js';
@@ -154,14 +154,14 @@ test('audio-idle completion waits for tool results and final answer text when th
   await new Promise(resolve=>setTimeout(resolve,25));assert.equal(completions,1);
 });
 
-test('roster consent, follow-up ownership, pause and stale callbacks are enforced',async()=>{
-  let now=1000,authorized=true;const intake:string[]=[],tools:string[]=[],callbacks:AgentCallbacks[]=[];let plays=0,stops=0;
+test('roster consent, explicit addressing on every turn, pause and stale callbacks are enforced',async()=>{
+  let authorized=true;const intake:string[]=[],tools:string[]=[],callbacks:AgentCallbacks[]=[];let plays=0,stops=0;
   const session=new VoiceSession(config,{
     authorized:async()=>authorized,intake:async(a,_id,text)=>{intake.push(a.userId+':'+text);},
     tool:async(a)=>{tools.push(a.userId);return {};},
   },{audio:()=>plays++,stop:()=>stops++,finish:()=>{},status:()=>{}},cb=>{
     callbacks.push(cb);return {start:async()=>{},message:()=>{},close:()=>{}} satisfies ConversationalConnection;
-  },()=>now);
+  });
   await session.transcript('alice','Hey Ray, hello');assert.equal(callbacks.length,0);
   session.join(actor);session.join(other);
   await session.transcript('alice','I work Tuesdays.');assert.equal(callbacks.length,0);assert.equal(intake.length,1);
@@ -170,11 +170,12 @@ test('roster consent, follow-up ownership, pause and stale callbacks are enforce
   assert.deepEqual(tools,['alice']);
   session.interrupt();callbacks[0]!.audio(Buffer.alloc(4),16000);assert.equal(plays,0);
   await assert.rejects(()=>callbacks[0]!.tool({tool_call_id:'2',tool_name:'x',parameters:{}},new AbortController().signal),/expired/);
-  await session.transcript('alice','And its grading?');assert.equal(callbacks.length,2);
+  await session.transcript('alice','And its grading?');assert.equal(callbacks.length,1);
+  await session.transcript('alice','Ray, and its grading?');assert.equal(callbacks.length,2);
   await session.transcript('bob','I prefer mornings.');assert.equal(callbacks.length,2);
   await session.transcript('alice','Another question.');assert.equal(callbacks.length,2);
   session.pause();await session.transcript('alice','Hey Ray, listen.');assert.equal(callbacks.length,2);
-  session.resume();now+=31000;await session.transcript('alice','No wake phrase.');assert.equal(callbacks.length,2);
+  session.resume();await session.transcript('alice','No wake phrase.');assert.equal(callbacks.length,2);
   authorized=false;await session.transcript('alice','Hey Ray, hello');assert.equal(session.participants.has('alice'),false);
   assert.ok(stops>0);session.close();
 });
@@ -201,7 +202,7 @@ test('joining greeting is conversational, never becomes student evidence, and ca
   session.join(actor);await session.greet(actor);assert.equal(requests,1);assert.equal(intake,0);
   await assert.rejects(()=>callbacks[0]!.tool({tool_name:'get_my_notes',tool_call_id:'bad',parameters:{}},new AbortController().signal),/Greeting/);
   callbacks[0]!.complete();
-  await session.transcript(actor.userId,'Hello!');assert.equal(requests,2);assert.equal(intake,1);
+  await session.transcript(actor.userId,'Hello!');assert.equal(requests,1);assert.equal(intake,1);
   session.close();
 });
 
@@ -230,4 +231,35 @@ test('pause/resume, context reset and leave/rejoin invalidate transcripts awaiti
       session.close();
     }
   }
+});
+
+test('passive conversation while research is pending preserves the final spoken answer',async()=>{
+  let callback!:AgentCallbacks,closed=0,plays=0;const retained:string[]=[];
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async(_a,_id,text)=>{retained.push(text);},tool:async()=>({})},
+    {audio:()=>plays++,stop:()=>{},finish:()=>{},status:()=>{}},cb=>{callback=cb;return {start:async()=>{},message:()=>{},close:()=>{closed++;}};});
+  session.join(actor);session.join(other);
+  await session.transcript(actor.userId,'Hey Ray, explain CSE 445.');
+  await session.transcript(other.userId,'Do you want lunch?');
+  await session.transcript(actor.userId,'Yes, how about noon?');
+  assert.equal(closed,0);assert.equal(retained.length,3);
+  callback.audio(Buffer.alloc(8),16000);assert.equal(plays,1);
+  callback.complete();assert.equal(closed,1);session.close();
+});
+
+test('a failed text delivery cannot discard a successful guest voice tool answer',async()=>{
+  const app={store:{read:async()=>({id:'session',participants:{alice:{active:false}}})},voiceQuestion:async()=> 'A supported answer'};
+  const backend=new PlanningVoiceBackend(app as unknown as PlanningApplication,{guildId:'guild',channelId:'voice-text'},'session',async()=>{throw new Error('Synthetic Discord outage');});
+  assert.equal(await backend.authorized(actor),true);
+  const result=await backend.tool(actor,{tool_name:'research_course',tool_call_id:'guest',parameters:{question:'test'}},new AbortController().signal) as {answer:string};
+  assert.equal(result.answer,'A supported answer');await tick();
+});
+
+test('partial transcription can identify a Ray interruption without admitting friend speech as a request',()=>{
+  const socket=new Socket();let interruptions=0,finals=0;
+  const scribe=new ScribeUtterance('synthetic',()=>finals++,()=>assert.fail('unexpected failure'),()=>socket as unknown as WebSocket,
+    text=>{if(addressesRay(text))interruptions++;});
+  socket.event({message_type:'partial_transcript',text:'What do you think about Ray?'});
+  assert.equal(interruptions,0);
+  socket.event({message_type:'partial_transcript',text:'Hey Ray, wait'});
+  assert.equal(interruptions,1);assert.equal(finals,0);scribe.close();
 });

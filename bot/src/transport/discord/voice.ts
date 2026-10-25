@@ -7,7 +7,7 @@ import type { PlanningApplication } from '../../application/planning.js';
 import { PlanningError, type Actor, type Room } from '../../domain/planning.js';
 import { discordPCM, SpeechDecoder, speechEnergy,SpeechActivityGate } from '../../voice/audio.js';
 import { ScribeUtterance } from '../../voice/elevenlabs.js';
-import { VoiceSession, type VoiceBackend } from '../../voice/session.js';
+import { addressesRay, VoiceSession, type VoiceBackend } from '../../voice/session.js';
 
 export const voiceNotice = 'Voice Ray sends opted-in audio to ElevenLabs for transcription and conversation. '
   + 'Say “Hey Ray” followed by your question; ordinary group discussion is noted quietly. '
@@ -39,11 +39,10 @@ export class DiscordVoice {
       if (interaction.options.getBoolean('consent') !== true) {
         await interaction.editReply(voiceNotice); return;
       }
-      const state = await this.app.store.read(room);
-      if (!state?.participants[actor.userId]?.active) throw new PlanningError('Start or join planning before opting into voice.');
       const guild = await this.client.guilds.fetch(room.guildId);
       const member = await guild.members.fetch(actor.userId);
       if (member.voice.channelId !== this.config.DISCORD_VOICE_CHANNEL_ID) throw new PlanningError('Join the configured voice channel first.');
+      const state=await this.app.voiceParticipant(room,actor);
       if (this.joining) throw new PlanningError('Ray is joining voice. Try again in a moment.');
       if (this.live && (this.live.room.channelId !== room.channelId || this.live.sessionId !== state.id)) throw new PlanningError('Ray already has a voice session in another planning workspace.');
       if (!this.live) {
@@ -53,7 +52,7 @@ export class DiscordVoice {
       // Starting a connection may take seconds; do not grant stale consent after reset/leave.
       const latest = await this.app.store.read(room);
       const currentMember = await guild.members.fetch(actor.userId);
-      if (latest?.id !== state.id || !latest.participants[actor.userId]?.active || currentMember.voice.channelId !== this.config.DISCORD_VOICE_CHANNEL_ID) {
+      if (latest?.id !== state.id || !latest.participants[actor.userId] || currentMember.voice.channelId !== this.config.DISCORD_VOICE_CHANNEL_ID) {
         if (!this.live?.session.participants.size) this.close();
         throw new PlanningError('Planning or voice membership changed. Join voice again to opt in.');
       }
@@ -131,7 +130,7 @@ export class DiscordVoice {
     // Subscribe immediately to retain the wake phrase while authorization is checked.
     const receive=live.connection.receiver.subscribe(userId,{end:{behavior:EndBehaviorType.AfterSilence,duration:700}});
     const decoder=new SpeechDecoder(),speech=new SpeechActivityGate(this.config.VOICE_INTERRUPTION_RMS);
-    let scribe:ScribeUtterance|undefined,pending:Buffer[]=[],bytes=0,ended=false,closed=false,authorized=false;
+    let scribe:ScribeUtterance|undefined,pending:Buffer[]=[],bytes=0,ended=false,closed=false,authorized=false,addressed=false;
     const close=()=>{if(closed)return;closed=true;clearTimeout(timeout);receive.destroy();decoder.close();scribe?.close();live.captures.delete(userId);};
     const timeout=setTimeout(()=>{ended=true;receive.destroy();if(scribe)scribe.finish();else close();},30000);
     const startScribe=()=>{
@@ -139,7 +138,11 @@ export class DiscordVoice {
       scribe=new ScribeUtterance(this.config.ELEVENLABS_API_KEY,text=>{
         this.diagnostic('transcript_completed',{captureId,characters:text.length,packets,pcmBytes});
         close();if(text&&this.live===live&&live.session.accepts(userId))void live.session.transcript(userId,text).catch(()=>{});
-      },()=>{this.diagnostic('transcription_failed',{captureId,packets,pcmBytes});close();if(this.live===live)void live.status?.edit({content:'Voice transcription failed. Please try again or use text.',allowedMentions:{parse:[]}}).catch(()=>{});});
+      },()=>{this.diagnostic('transcription_failed',{captureId,packets,pcmBytes});close();if(this.live===live)void live.status?.edit({content:'Voice transcription failed. Please try again or use text.',allowedMentions:{parse:[]}}).catch(()=>{});},undefined,text=>{
+        if(!addressed&&this.live===live&&live.session.accepts(userId)&&addressesRay(text)){
+          addressed=true;live.session.interrupt();
+        }
+      });
       for(const pcm of pending)scribe.write(pcm);pending=[];bytes=0;
       if(ended)scribe.finish();
     };
@@ -150,7 +153,7 @@ export class DiscordVoice {
       try{
         const pcm=decoder.decode(packet);
         packets++;pcmBytes+=pcm.length;peakEnergy=Math.max(peakEnergy,Math.round(speechEnergy(pcm)));
-        if(speech.push(pcm)){this.diagnostic('speech_interrupt',{captureId,peakEnergy});live.session.interrupt();}
+        speech.push(pcm); // Human speech alone must not cancel Ray's pending researched answer.
         if(scribe)scribe.write(pcm);else{bytes+=pcm.length;if(bytes>160000){close();return;}pending.push(pcm);}
         startScribe();
       }catch{this.diagnostic('decode_error',{captureId,packets,pcmBytes});close();}
@@ -165,7 +168,7 @@ export class DiscordVoice {
     const state=await this.app.store.read(live.room);
     if(this.live!==live)return;
     if(state?.id!==live.sessionId){this.close();return;}
-    for(const userId of live.session.participants.keys())if(!state.participants[userId]?.active){live.captures.get(userId)?.();live.session.leave(userId);}
+    for(const userId of live.session.participants.keys())if(!state.participants[userId]){live.captures.get(userId)?.();live.session.leave(userId);}
     if(!live.session.participants.size)this.close();
   }
   departed(userId:string,channelId:string|null):void{

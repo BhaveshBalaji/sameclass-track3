@@ -144,7 +144,7 @@ export class ScribeUtterance {
   private timer: ReturnType<typeof setTimeout>;
   private fail:()=>void;
   constructor(key: string, final: (text: string) => void, failed: () => void,
-    socketFactory: SocketFactory = createSocket) {
+    socketFactory: SocketFactory = createSocket, partial: (text:string)=>void = ()=>{}) {
     const url = new URL('wss://api.elevenlabs.io/v1/speech-to-text/realtime');
     url.search = new URLSearchParams({ model_id: 'scribe_v2_realtime', audio_format: 'pcm_16000',
       sample_rate: '16000', commit_strategy: 'vad', vad_silence_threshold_secs:'0.7',
@@ -165,6 +165,8 @@ export class ScribeUtterance {
           for (const chunk of this.queue) this.send(chunk);
           this.queue = []; this.bytes = 0;
           if (this.finished) this.commit();
+        } else if (event.message_type === 'partial_transcript') {
+          partial(String(event.text??'').slice(0,4000));
         } else if (event.message_type === 'committed_transcript') {
           // Empty speech is still a terminal result: the caller must release
           // its member capture slot rather than wait forever for another turn.

@@ -193,3 +193,14 @@ Added a configurable sustained-speech energy gate to suppress quiet background/c
 - [ ] V2: separate notes/corrections/reset tested with isolated Postgres; live speaker recognition and read-back pending.
 - [ ] V3: named allocation presentation and stale-result guards tested; live group readout pending.
 - [ ] V4: controls/recap/setup checks implemented; two complete live rehearsals pending. Optional proactivity deferred.
+
+
+### Explicit-address and guest voice update — October 25
+
+Latest user requirements supersede the earlier automatic follow-up window and mandatory planning enrollment for voice. Every spoken request must address Ray, including follow-ups. Ordinary discussion remains bounded, speaker-attributed pending evidence and no longer cancels an active researched answer. Scribe partial transcripts allow a recognized Ray address to interrupt playback; this has transcription latency and is not instantaneous voice-activity interruption.
+
+Voice opt-in is separate from planning enrollment. `/voice join consent:true` can initialize a voice-only workspace without inventing a semester. Guests can research courses and refresh/read their own notes; `/plan start` promotes the same workspace and preserves notes. Planning leave preserves pending voice notes and does not revoke audio consent; `/voice leave` does. Recommendations require requester enrollment and include only enrolled members, with an invitation for omitted guests. Profile reset remains available to guests. Passive sources are extracted at notes/recap/recommendation checkpoints, not with a model call on every utterance.
+
+The dedicated Jessica female voice and warm greeting remain configured. Provider prompt was read, updated through ElevenLabs tools, and verified. Text delivery runs independently after the result is durably queued so a Discord delivery failure cannot discard a successful spoken tool answer. Dedicated ray-help / ray-voice-help channel IDs remain configured locally; voice controls in the original main channel remain blocked with a private redirect.
+
+Validation: TypeScript build; 18 voice tests; 7 voice/planning database tests; 10 planning database regressions; 24 group regressions; 31 foundation/research regressions. One bounded live synthetic ElevenLabs delayed-tool check returned 419840 PCM bytes total, including 337920 bytes after the tool result. This verifies provider-generated final speech, not Discord microphone/playback acceptance. The single worker was restarted. Pending human checks: guest joining without planning, real course answers aloud while friends talk, explicit-Ray interruptions, two-person attribution, and group recommendation rehearsal. No new live-human acceptance is claimed.
