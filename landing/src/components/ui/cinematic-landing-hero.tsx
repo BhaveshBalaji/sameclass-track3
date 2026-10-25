@@ -48,8 +48,8 @@ export function CinematicHero({
         "--phone-scale",
         String(
           Math.min(
-            innerWidth < 760 ? 0.83 : 1,
-            (innerHeight - (innerWidth < 760 ? 265 : 190)) / 680,
+            innerWidth < 760 ? 0.78 : 1,
+            (innerHeight - (innerWidth < 760 ? 300 : 190)) / 680,
           ),
         ),
       );
@@ -358,18 +358,18 @@ export function CinematicHero({
       <div className="reading-experience">
         <div className="reading-intro">
           <RayIcon />
-          <p className="overline">RAY / A SEMESTER, TOGETHER</p>
+          <p className="eyebrow">RAY / A SEMESTER, TOGETHER</p>
           <h1>
-            Your people.
+            Keep the connection.
             <br />
-            <span>Your semester.</span>
+            <span>Lose the legwork.</span>
           </h1>
           <p>Six moments. One group conversation.</p>
         </div>
         {chapters.map((chapter, i) => (
           <section className="reading-chapter" id={chapter.id} key={chapter.id}>
             <div className="reading-copy">
-              <span className="overline">
+              <span className="eyebrow">
                 0{i + 1} / {chapter.label}
               </span>
               <h2>{chapter.title}</h2>
@@ -377,7 +377,7 @@ export function CinematicHero({
             </div>
             <Phone>
               {i === 5 ? (
-                <Voice beat={2} reading />
+                <Voice reading />
               ) : (
                 <Chat
                   lines={chapter.lines}
@@ -419,20 +419,22 @@ export function CinematicHero({
       <div className="film-grain" aria-hidden="true" />
       <div className="bg-grid-theme" aria-hidden="true" />
       <div className="hero-text-wrapper">
-        <p className="overline intro-detail">
+        <p className="eyebrow intro-detail">
           <span className="live-light" />
           YOUR DISCORD GROUP. ONE BRIGHTER SEMESTER.
         </p>
         <h1>
-          <span className="hero-line-one text-3d-matte">Your people.</span>
+          <span className="hero-line-one text-3d-matte">
+            Keep the connection.
+          </span>
           <span className="hero-line-two text-silver-matte">
-            Your semester.
+            Lose the legwork.
           </span>
         </h1>
         <p className="hero-description intro-detail">
-          From “what should we take?” to a plan that fits.
+          Your friends do the talking. Ray does the research.
           <br />
-          Meet Ray in your group chat.
+          Share, ask, and decide together in Discord.
         </p>
         <button className="intro-detail start-experience" onClick={startStory}>
           SCROLL INTO THE CONVERSATION <ArrowDown size={18} />
@@ -440,7 +442,7 @@ export function CinematicHero({
       </div>
       <div className="closing-wrapper">
         <RayIcon />
-        <p className="overline">NOW, LET’S MAKE IT REAL.</p>
+        <p className="eyebrow">NOW, LET’S MAKE IT REAL.</p>
         <h2>
           Better plans.
           <br />
@@ -474,15 +476,17 @@ export function CinematicHero({
             RAY
           </span>
           <div
-            className={`chapter-copy ${frame.chapter % 2 === 0 ? "copy-left" : "copy-right"}`}
+            className={`chapter-copy-anchor ${frame.chapter % 2 === 0 ? "copy-left" : "copy-right"}`}
           >
-            <p className="overline">
-              0{frame.chapter + 1} / {chapter.eyebrow}
-            </p>
-            <h2>{chapter.title}</h2>
-            <p className="chapter-description">{chapter.description}</p>
-            <div className="chapter-aside">
-              <span /> {chapter.aside}
+            <div className="chapter-copy">
+              <p className="eyebrow">
+                0{frame.chapter + 1} / {chapter.eyebrow}
+              </p>
+              <h2>{chapter.title}</h2>
+              <p className="chapter-description">{chapter.description}</p>
+              <div className="chapter-aside">
+                <span /> {chapter.aside}
+              </div>
             </div>
           </div>
           <div className="device-axis">
@@ -490,7 +494,7 @@ export function CinematicHero({
               <div className="device-scale">
                 <Phone>
                   {frame.chapter === 5 ? (
-                    <Voice beat={frame.beat} />
+                    <Voice active={frame.phase === "story"} />
                   ) : (
                     <Chat lines={chapter.lines} visible={frame.visible} />
                   )}
@@ -516,9 +520,7 @@ export function CinematicHero({
               SCROLL TO CONTINUE <ChevronDown size={13} />
             </span>
           </nav>
-          <p className="scripted-label">
-            SCRIPTED DEMONSTRATION · EXAMPLE COURSES, TIMES, REVIEWS & GRADING
-          </p>
+          <p className="scripted-label">SCRIPTED DEMO · EXAMPLE DATA</p>
         </div>
       </div>
       {scrollHint && (

@@ -18,3 +18,19 @@ October 25, 2026 · branch `codex/ray-cinematic`, based on `demo`.
 - The prior landing source, styles, fonts, icons and example PDFs were deleted. The bot source remains unchanged.
 
 The on-page conversations, professor, section times, grading and source excerpts are illustrative data. These checks validate the presentation, not a live model call, real section availability, review retrieval, syllabus extraction, or voice transport.
+
+## Annotation update
+
+- Headline replaced with the six-word “Keep the connection. Lose the legwork.” in cinematic and reading modes.
+- Removed the accidental Tailwind `overline` decoration by renaming the class to `eyebrow`; computed decoration is `none`.
+- Desktop explanation copy is 20px in the hero and 18px in chapters, with 12px eyebrow labels and 14px supporting asides. Chat text, navigation, source dialogs and mobile copy were enlarged as well.
+- Chapter text uses a separate centering wrapper so GSAP motion does not displace the larger copy into the navigation.
+- Generated 12 speech turns with five verified stock ElevenLabs voices, measured cue boundaries and peak-safe level matching. Browser-loaded duration is 102.4 seconds.
+- Browser verified mic play, pause and resume; audio-synchronized captions and speaker highlights; a source click pausing playback and opening its inspector; and the complete recording reaching the final Arjun response with status `ended`.
+- The generation key is absent from frontend source and output assets. Playback uses a static AAC file and does not make ElevenLabs requests or record microphone input.
+
+## Pre-merge repository checks
+
+Python: Ruff passes; 53 tests pass (one upstream Starlette deprecation warning).
+Bot: TypeScript/build, the main test suite, planning tests, group tests, database checks and deterministic replay pass against an isolated local PostgreSQL test database.
+The existing video helper's lint-only formatting fix preserves its normalized syntax tree.

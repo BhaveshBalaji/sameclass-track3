@@ -438,36 +438,11 @@ export const chapters: Chapter[] = [
     ),
     description:
       "Move the conversation to a Discord voice channel. Discuss among yourselves, say “Ray,” and ask a question or request recommendations without switching back to text.",
-    aside: "Just say “Ray.” Keep the conversation going.",
+    aside: "Unmute the mic to hear the group. You stay in control.",
     lines: [],
   },
 ];
-export const voiceLines = [
-  {
-    person: "Nina" as Person,
-    text: "I like the plan. Are we all okay with the afternoon classes?",
-  },
-  {
-    person: "Maya" as Person,
-    text: "Yeah. But I want to compare the project work first.",
-  },
-  {
-    person: "Arjun" as Person,
-    text: "Ray, what does the database course project involve?",
-  },
-  {
-    person: "Ray" as Person,
-    text: "Let me check the syllabus for that section and summarize the project requirements.",
-  },
-  {
-    person: "Leo" as Person,
-    text: "Ray, can you also recommend a plan that keeps my Tuesday and Thursday mornings free?",
-  },
-  {
-    person: "Ray" as Person,
-    text: "Yes. I’ll keep those work hours as a hard constraint and look for the most classes you can share.",
-  },
-];
+export { voiceCues as voiceLines } from "./voice";
 export const sourceContent = {
   catalog: {
     title: "Course catalog",

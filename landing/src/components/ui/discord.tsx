@@ -1,10 +1,12 @@
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Hash,
   Plus,
   Smile,
   Mic,
+  MicOff,
+  LoaderCircle,
   Headphones,
   Volume2,
   Video,
@@ -12,7 +14,8 @@ import {
   Signal,
   BatteryFull,
 } from "lucide-react";
-import { type ChatLine, type Person, voiceLines } from "@/data/story";
+import { type ChatLine, type Person, SourceLink } from "@/data/story";
+import { voiceCues, voiceScenario } from "@/data/voice";
 export function RayIcon({ className = "" }: { className?: string }) {
   return (
     <img
@@ -105,15 +108,98 @@ export function Chat({
   );
 }
 export function Voice({
-  beat,
   reading = false,
+  active = true,
 }: {
-  beat: number;
   reading?: boolean;
+  active?: boolean;
 }) {
-  const current = voiceLines[Math.min(beat, voiceLines.length - 1)];
+  const audio = useRef<HTMLAudioElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<
+    "ready" | "loading" | "playing" | "paused" | "ended" | "error"
+  >("ready");
+  const [position, setPosition] = useState(0);
+  const playing = status === "playing";
+  const started = status !== "ready" && position > 0;
+  const cue =
+    voiceCues.find(
+      (item, index) =>
+        position >= item.start &&
+        position < (voiceCues[index + 1]?.start ?? Infinity),
+    ) || voiceCues[0];
+  const stop = () => {
+    const media = audio.current;
+    if (!media) return;
+    media.pause();
+    media.currentTime = 0;
+    setPosition(0);
+    setStatus("ready");
+  };
+  const toggle = async () => {
+    const media = audio.current;
+    if (!media) return;
+    if (!media.paused) {
+      media.pause();
+      return;
+    }
+    if (status === "error") media.load();
+    if (media.ended) {
+      media.currentTime = 0;
+      setPosition(0);
+    }
+    setStatus("loading");
+    try {
+      await media.play();
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError"))
+        setStatus("error");
+    }
+  };
+  useEffect(() => {
+    if (!active) audio.current?.pause();
+  }, [active]);
+  useEffect(() => {
+    const media = audio.current;
+    const visibility = () => {
+      if (document.hidden) media?.pause();
+    };
+    document.addEventListener("visibilitychange", visibility);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) media?.pause();
+      },
+      { threshold: 0.1 },
+    );
+    if (panel.current) observer.observe(panel.current);
+    return () => {
+      media?.pause();
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, []);
+  const sourceNames = {
+    catalog: "Course catalog",
+    syllabus: "Syllabus · p. 1",
+    reviews: "RMP reviews",
+  };
   return (
-    <div className="discord-voice">
+    <div className="discord-voice" ref={panel} data-playback={status}>
+      <audio
+        ref={audio}
+        src={`./assets/voice/${voiceScenario.audio}`}
+        preload="metadata"
+        onTimeUpdate={(event) => setPosition(event.currentTarget.currentTime)}
+        onPlaying={() => setStatus("playing")}
+        onPause={(event) => {
+          const ended = event.currentTarget.ended;
+          setStatus((old) =>
+            old === "ready" ? "ready" : ended ? "ended" : "paused",
+          );
+        }}
+        onEnded={() => setStatus("ended")}
+        onError={() => setStatus("error")}
+      />
       <div className="discord-header">
         <ArrowLeft size={21} />
         <Volume2 size={21} />
@@ -122,13 +208,14 @@ export function Voice({
         </span>
       </div>
       <div className="voice-connected">
-        <Signal size={12} /> Voice connected
+        <Signal size={12} />
+        Voice connected
       </div>
       <div className="voice-grid">
         {(["Maya", "Arjun", "Nina", "Leo", "Ray"] as Person[]).map((person) => (
           <div
-            className={`voice-member ${current.person === person ? "is-speaking" : ""}`}
             key={person}
+            className={`voice-member ${playing && cue.person === person ? "is-speaking" : ""}`}
           >
             <Avatar person={person} />
             <span>
@@ -140,7 +227,7 @@ export function Voice({
         ))}
       </div>
       <div
-        className={`voice-wave ${reading ? "still" : ""}`}
+        className={`voice-wave ${playing && !reading ? "is-playing" : ""}`}
         aria-hidden="true"
       >
         {Array.from({ length: 29 }, (_, i) => (
@@ -153,20 +240,69 @@ export function Voice({
           />
         ))}
       </div>
-      <div className="live-caption">
-        <strong>{current.person}</strong>
-        <p>“{current.text}”</p>
+      <div className="live-caption" role="status" aria-live="polite">
+        <strong>{started ? cue.person : "Your group"}</strong>
+        <p>
+          {status === "error"
+            ? "Audio couldn’t load. Tap the mic to try again."
+            : !started
+              ? "Unmute to hear the group plan Spring 2027 together."
+              : `“${cue.text}”`}
+        </p>
+        {started && cue.sources.length > 0 && (
+          <div
+            className="voice-source-links"
+            onClick={() => audio.current?.pause()}
+          >
+            {cue.sources.map((source) => (
+              <SourceLink key={source} kind={source}>
+                {sourceNames[source]}
+              </SourceLink>
+            ))}
+          </div>
+        )}
       </div>
-      <div className="voice-native-controls" aria-hidden="true">
-        <span>
+      <div className="voice-native-controls">
+        <span aria-hidden="true">
           <Video size={19} />
         </span>
-        <span>
-          <Mic size={19} />
-        </span>
-        <span className="hang-up">
+        <button
+          type="button"
+          onClick={toggle}
+          className={`mic-play ${playing ? "is-unmuted" : ""}`}
+          aria-label={
+            playing
+              ? "Mute and pause the group conversation"
+              : "Unmute and play the group conversation"
+          }
+          aria-pressed={playing}
+          title={playing ? "Mute / pause" : "Unmute / play"}
+        >
+          {status === "loading" ? (
+            <LoaderCircle size={19} className="loading-spinner" />
+          ) : playing ? (
+            <Mic size={19} />
+          ) : (
+            <MicOff size={19} />
+          )}
+        </button>
+        <button
+          type="button"
+          className="hang-up"
+          aria-label="End and reset the group conversation"
+          onClick={stop}
+        >
           <PhoneOff size={19} />
-        </span>
+        </button>
+      </div>
+      <div className="voice-playback-note">
+        {status === "ended"
+          ? "Call finished · unmute to replay"
+          : playing
+            ? "Playing the group conversation"
+            : status === "paused"
+              ? "Paused · unmute to continue"
+              : "Unmute to play · about 1 min 40 sec"}
       </div>
     </div>
   );

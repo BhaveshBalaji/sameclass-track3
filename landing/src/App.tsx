@@ -134,7 +134,7 @@ export default function App() {
         >
           <X size={22} />
         </button>
-        <p className="overline">{selected.label}</p>
+        <p className="eyebrow">{selected.label}</p>
         <h2 id="source-title">{selected.title}</h2>
         <p>{selected.body}</p>
         <div className="source-excerpt">
@@ -171,7 +171,7 @@ export default function App() {
           <X size={22} />
         </button>
         <RayIcon />
-        <p className="overline">FROM THE STORY TO YOUR SERVER.</p>
+        <p className="eyebrow">FROM THE STORY TO YOUR SERVER.</p>
         <h2 id="demo-title">Let’s talk to Ray.</h2>
         <p>
           Open your Discord server with Ray running, and continue the

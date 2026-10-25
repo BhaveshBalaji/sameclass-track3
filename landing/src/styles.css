@@ -61,8 +61,8 @@ input:focus-visible,
 svg {
   flex-shrink: 0;
 }
-.overline {
-  font-size: 10px;
+.eyebrow {
+  font-size: 12px;
   line-height: 1.6;
   font-weight: 700;
   letter-spacing: 2.2px;
@@ -103,7 +103,7 @@ svg {
   letter-spacing: 2px;
 }
 .header-caption {
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 2px;
   color: #8c92a7;
   margin-left: 15px;
@@ -118,7 +118,7 @@ svg {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 9px;
+  font-size: 12px;
   color: #a7aec4;
   padding: 10px 0;
 }
@@ -129,7 +129,7 @@ svg {
   display: flex;
   align-items: center;
   gap: 20px;
-  font-size: 11px;
+  font-size: 12px;
   padding: 11px 17px;
   border-radius: 8px;
   border: 1px solid #ffffff24;
@@ -182,9 +182,9 @@ svg {
   will-change: transform, filter;
   perspective: 1500px;
 }
-.hero-text-wrapper > .overline {
+.hero-text-wrapper > .eyebrow {
   color: #bcc5dc;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 2.6px;
   display: flex;
   gap: 8px;
@@ -239,7 +239,7 @@ svg {
   align-items: center;
   gap: 13px;
   padding: 14px 0;
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 1.7px;
   font-weight: 600;
   color: #dce4ff;
@@ -258,7 +258,7 @@ svg {
   z-index: 15;
 }
 .scroll-indicator > span {
-  font-size: 7px;
+  font-size: 12px;
   letter-spacing: 1.5px;
   color: #5e6881;
   white-space: nowrap;
@@ -370,9 +370,9 @@ svg {
 .chapter-copy.copy-right {
   right: 7%;
 }
-.chapter-copy .overline {
+.chapter-copy .eyebrow {
   color: #9cb5ff;
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 1.5px;
   margin-bottom: 27px;
   max-width: 370px;
@@ -403,7 +403,7 @@ svg {
   display: flex;
   align-items: flex-start;
   gap: 9px;
-  font-size: 9px;
+  font-size: 12px;
   color: #cad8fa;
   margin-top: 30px;
   line-height: 1.7;
@@ -509,7 +509,7 @@ svg {
   justify-content: space-between;
   background: #232428;
   padding: 0 19px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #fff;
   position: relative;
@@ -554,7 +554,7 @@ svg {
 .discord-header small {
   display: block;
   color: #949ba4;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 400;
   letter-spacing: 0;
 }
@@ -575,7 +575,7 @@ svg {
   align-items: center;
   gap: 8px;
   color: #949ba4;
-  font-size: 8px;
+  font-size: 12px;
   margin: 2px 0 18px;
 }
 .day-label span {
@@ -644,7 +644,7 @@ svg {
   color: #ffdb78;
 }
 .message-name time {
-  font-size: 7px;
+  font-size: 12px;
   color: #969ca6;
   white-space: nowrap;
   font-weight: 400;
@@ -653,7 +653,7 @@ svg {
   background: #5865f2;
   border-radius: 3px;
   color: #fff;
-  font-size: 6px;
+  font-size: 12px;
   font-weight: 600;
   padding: 1px 3px;
   line-height: 1.4;
@@ -684,7 +684,7 @@ svg {
 }
 .source-link {
   color: #7bbcff;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.6;
   text-align: left;
   padding: 0;
@@ -701,7 +701,7 @@ svg {
   align-items: center;
   gap: 3px;
   color: #949ba4;
-  font-size: 8px;
+  font-size: 12px;
   padding: 0 0 15px 4px;
   min-height: 27px;
 }
@@ -734,7 +734,7 @@ svg {
   color: #a3a9b2;
 }
 .discord-compose span {
-  font-size: 9px;
+  font-size: 12px;
   color: #969ca6;
   flex: 1;
 }
@@ -772,10 +772,10 @@ svg {
   transition: color 0.2s;
 }
 .chapter-navigation > button span {
-  font-size: 8px;
+  font-size: 12px;
 }
 .chapter-navigation > button b {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -802,7 +802,7 @@ svg {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 6px;
+  font-size: 12px;
   letter-spacing: 1.4px;
   color: #788bb1;
   white-space: nowrap;
@@ -811,7 +811,7 @@ svg {
   position: absolute;
   left: 8%;
   bottom: 19px;
-  font-size: 5px;
+  font-size: 12px;
   letter-spacing: 1.1px;
   color: #65799f;
   z-index: 56;
@@ -834,7 +834,7 @@ svg {
   align-items: center;
   justify-content: center;
   color: #85cba3;
-  font-size: 8px;
+  font-size: 12px;
   margin-top: 15px;
 }
 .voice-grid {
@@ -878,7 +878,7 @@ svg {
   margin: 0;
 }
 .voice-member > span:not(.avatar) {
-  font-size: 9px;
+  font-size: 12px;
   color: #cbd0d9;
   margin-bottom: 10px;
   display: flex;
@@ -933,11 +933,11 @@ svg {
   min-height: 90px;
 }
 .live-caption > strong {
-  font-size: 9px;
+  font-size: 12px;
   color: #efcf8a;
 }
 .live-caption > p {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.7;
   color: #c1c8d8;
   margin-top: 7px;
@@ -983,8 +983,8 @@ svg {
   filter: drop-shadow(0 0 24px #ffcb4b20);
   margin-bottom: 24px;
 }
-.closing-wrapper > .overline {
-  font-size: 8px;
+.closing-wrapper > .eyebrow {
+  font-size: 12px;
   color: #b2bcd6;
   letter-spacing: 2.3px;
 }
@@ -1003,7 +1003,7 @@ svg {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
-.closing-wrapper > p:not(.overline) {
+.closing-wrapper > p:not(.eyebrow) {
   font-size: 14px;
   line-height: 1.8;
   color: #969eb7;
@@ -1040,7 +1040,7 @@ svg {
   transform: translateY(1px);
 }
 .restart-link {
-  font-size: 8px;
+  font-size: 12px;
   color: #74829f;
   letter-spacing: 0.5px;
   margin-top: 24px;
@@ -1056,15 +1056,15 @@ svg {
   gap: 20px;
   padding: 0 48px;
   color: #56627e;
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 0.7px;
 }
 .site-footer > span:first-child {
-  font-size: 7px;
+  font-size: 12px;
   letter-spacing: 1.4px;
 }
 .site-footer button {
-  font-size: 8px;
+  font-size: 12px;
   color: #8795b4;
   display: flex;
   align-items: center;
@@ -1109,9 +1109,9 @@ dialog::backdrop {
   height: 30px;
   color: #9ca8c4;
 }
-.source-dialog > .overline,
-.demo-dialog > .overline {
-  font-size: 7px;
+.source-dialog > .eyebrow,
+.demo-dialog > .eyebrow {
+  font-size: 12px;
   color: #8ca7e4;
   margin: 17px 0;
 }
@@ -1123,8 +1123,8 @@ dialog::backdrop {
   line-height: 1.1;
   margin: 14px 0;
 }
-.source-dialog > p:not(.overline),
-.demo-dialog > p:not(.overline) {
+.source-dialog > p:not(.eyebrow),
+.demo-dialog > p:not(.eyebrow) {
   font-size: 12px;
   color: #9caac8;
   line-height: 1.8;
@@ -1141,14 +1141,14 @@ dialog::backdrop {
   padding: 7px 0;
 }
 .text-action {
-  font-size: 11px;
+  font-size: 12px;
   display: flex;
   align-items: center;
   gap: 9px;
   color: #e8cf97;
 }
 .source-dialog > p.source-note {
-  font-size: 9px;
+  font-size: 12px;
   margin-top: 23px;
   color: #7384a8;
 }
@@ -1171,7 +1171,7 @@ dialog::backdrop {
   gap: 15px;
 }
 .demo-dialog li > b {
-  font-size: 9px;
+  font-size: 12px;
   color: #f4cf7e;
   padding-top: 3px;
 }
@@ -1179,13 +1179,13 @@ dialog::backdrop {
   color: #f4cf7e;
 }
 .demo-dialog li > span {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
   color: #bbc7df;
 }
 .demo-dialog code {
   color: #eef1ff;
-  font-size: 10px;
+  font-size: 12px;
   background: #ffffff0b;
   padding: 2px 4px;
   border-radius: 4px;
@@ -1194,7 +1194,7 @@ dialog::backdrop {
   padding: 13px;
   border: 1px solid #ffffff24;
   border-radius: 8px;
-  font-size: 10px;
+  font-size: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1210,7 +1210,7 @@ dialog::backdrop {
 }
 .demo-configuration label {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   color: #b9c6e5;
   margin-bottom: 12px;
 }
@@ -1219,7 +1219,7 @@ dialog::backdrop {
   gap: 8px;
 }
 .demo-configuration input {
-  font-size: 11px;
+  font-size: 12px;
   width: 100%;
   min-width: 0;
   padding: 12px;
@@ -1236,11 +1236,11 @@ dialog::backdrop {
   display: flex;
   gap: 9px;
   align-items: center;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
 }
 .demo-configuration small {
-  font-size: 8px;
+  font-size: 12px;
   color: #697b9f;
   display: block;
   margin-top: 13px;
@@ -1249,7 +1249,7 @@ dialog::backdrop {
   margin-top: 18px;
 }
 .demo-configuration > .error {
-  font-size: 10px;
+  font-size: 12px;
   color: #ffad9d;
   margin-top: 12px;
 }
@@ -1267,7 +1267,7 @@ dialog::backdrop {
   height: 66px;
   margin: 0 auto 25px;
 }
-.reading-intro > .overline {
+.reading-intro > .eyebrow {
   color: #9eaed3;
 }
 .reading-intro h1 {
@@ -1302,9 +1302,9 @@ dialog::backdrop {
 .reading-copy {
   max-width: 430px;
 }
-.reading-copy > .overline {
+.reading-copy > .eyebrow {
   color: #acc2ff;
-  font-size: 10px;
+  font-size: 12px;
 }
 .reading-copy h2 {
   font-size: 52px;
@@ -1396,11 +1396,11 @@ dialog::backdrop {
   .chapter-copy {
     max-width: 500px;
   }
-  .chapter-copy .overline {
-    font-size: 9px;
+  .chapter-copy .eyebrow {
+    font-size: 12px;
   }
   .chapter-aside {
-    font-size: 11px;
+    font-size: 12px;
   }
   .chapter-navigation {
     gap: 30px;
@@ -1409,7 +1409,7 @@ dialog::backdrop {
     min-width: 110px;
   }
   .chapter-navigation > button b {
-    font-size: 10px;
+    font-size: 12px;
   }
 }
 @media (max-width: 1100px) and (min-width: 760px) {
@@ -1433,13 +1433,13 @@ dialog::backdrop {
     font-size: 12px;
     max-width: 280px;
   }
-  .chapter-copy .overline {
-    font-size: 6px;
+  .chapter-copy .eyebrow {
+    font-size: 12px;
     letter-spacing: 1.2px;
     max-width: 260px;
   }
   .chapter-aside {
-    font-size: 8px;
+    font-size: 12px;
     max-width: 260px;
   }
   .chapter-navigation {
@@ -1452,10 +1452,10 @@ dialog::backdrop {
     gap: 4px;
   }
   .chapter-navigation > button b {
-    font-size: 8px;
+    font-size: 12px;
   }
   .scroll-to-continue {
-    font-size: 5px;
+    font-size: 12px;
     letter-spacing: 0.7px;
   }
   .hero-text-wrapper h1 {
@@ -1488,12 +1488,12 @@ dialog::backdrop {
   }
   .header-cta {
     padding: 9px 12px;
-    font-size: 10px;
+    font-size: 12px;
     gap: 10px;
     border-radius: 7px;
   }
   .motion-control {
-    font-size: 8px;
+    font-size: 12px;
     gap: 4px;
   }
   .motion-control svg {
@@ -1502,8 +1502,8 @@ dialog::backdrop {
   .hero-text-wrapper {
     padding: 80px 18px 60px;
   }
-  .hero-text-wrapper > .overline {
-    font-size: 6px;
+  .hero-text-wrapper > .eyebrow {
+    font-size: 12px;
     letter-spacing: 1.6px;
     margin-bottom: 25px;
     gap: 6px;
@@ -1520,7 +1520,7 @@ dialog::backdrop {
     margin-top: 25px;
   }
   .start-experience {
-    font-size: 7px;
+    font-size: 12px;
     letter-spacing: 1.3px;
     margin-top: 23px;
     gap: 10px;
@@ -1533,7 +1533,7 @@ dialog::backdrop {
     gap: 10px;
   }
   .scroll-indicator > span {
-    font-size: 5px;
+    font-size: 12px;
     letter-spacing: 1px;
   }
   .scroll-indicator > div {
@@ -1552,8 +1552,8 @@ dialog::backdrop {
     transform: none !important;
     text-align: center;
   }
-  .chapter-copy > .overline {
-    font-size: 5px;
+  .chapter-copy > .eyebrow {
+    font-size: 12px;
     letter-spacing: 1.1px;
     margin: 0 0 10px;
     max-width: none;
@@ -1572,7 +1572,7 @@ dialog::backdrop {
     display: block;
   }
   .chapter-description {
-    font-size: 9px;
+    font-size: 12px;
     line-height: 1.7;
     max-width: 350px;
     margin: 10px auto 0;
@@ -1606,10 +1606,10 @@ dialog::backdrop {
     gap: 4px;
   }
   .chapter-navigation > button span {
-    font-size: 6px;
+    font-size: 12px;
   }
   .chapter-navigation > button b {
-    font-size: 5px;
+    font-size: 12px;
   }
   .scroll-to-continue {
     display: none;
@@ -1618,7 +1618,7 @@ dialog::backdrop {
     left: 6%;
     right: 6%;
     bottom: 17px;
-    font-size: 4px;
+    font-size: 12px;
     letter-spacing: 0.65px;
     text-align: center;
     line-height: 1.7;
@@ -1631,8 +1631,8 @@ dialog::backdrop {
     height: 54px;
     margin-bottom: 18px;
   }
-  .closing-wrapper > .overline {
-    font-size: 6px;
+  .closing-wrapper > .eyebrow {
+    font-size: 12px;
     letter-spacing: 1.5px;
   }
   .closing-wrapper h2,
@@ -1642,13 +1642,13 @@ dialog::backdrop {
     line-height: 1.05;
     margin: 23px 0;
   }
-  .closing-wrapper > p:not(.overline) {
-    font-size: 11px;
+  .closing-wrapper > p:not(.eyebrow) {
+    font-size: 12px;
     line-height: 1.9;
     margin-bottom: 25px;
   }
   .btn-modern-light {
-    font-size: 11px;
+    font-size: 12px;
     padding: 15px 20px;
     gap: 23px;
     border-radius: 11px;
@@ -1657,7 +1657,7 @@ dialog::backdrop {
     width: 17px;
   }
   .restart-link {
-    font-size: 7px;
+    font-size: 12px;
     margin-top: 20px;
   }
   .site-footer {
@@ -1666,19 +1666,19 @@ dialog::backdrop {
     min-height: 90px;
     flex-wrap: wrap;
     gap: 13px;
-    font-size: 7px;
+    font-size: 12px;
   }
   .site-footer > span:first-child {
-    font-size: 6px;
+    font-size: 12px;
     letter-spacing: 1px;
   }
   .site-footer > span:nth-child(2) {
     order: 3;
     flex-basis: 100%;
-    font-size: 7px;
+    font-size: 12px;
   }
   .site-footer button {
-    font-size: 7px;
+    font-size: 12px;
   }
   .reading-intro {
     padding: 50px 18px 70px;
@@ -1687,8 +1687,8 @@ dialog::backdrop {
     font-size: 57px;
     letter-spacing: -3px;
   }
-  .reading-intro > .overline {
-    font-size: 7px;
+  .reading-intro > .eyebrow {
+    font-size: 12px;
   }
   .reading-intro > p:last-child {
     font-size: 12px;
@@ -1702,8 +1702,8 @@ dialog::backdrop {
   .reading-copy {
     text-align: center;
   }
-  .reading-copy > .overline {
-    font-size: 7px;
+  .reading-copy > .eyebrow {
+    font-size: 12px;
   }
   .reading-copy h2 {
     font-size: 35px;
@@ -1724,7 +1724,7 @@ dialog::backdrop {
     border: 0;
   }
   .reading-voice-transcript p {
-    font-size: 11px;
+    font-size: 12px;
   }
   .reading-outro {
     padding: 65px 20px;
@@ -1737,15 +1737,15 @@ dialog::backdrop {
   .demo-dialog h2 {
     font-size: 27px;
   }
-  .source-dialog > p:not(.overline),
-  .demo-dialog > p:not(.overline) {
-    font-size: 11px;
+  .source-dialog > p:not(.eyebrow),
+  .demo-dialog > p:not(.eyebrow) {
+    font-size: 12px;
   }
-  .demo-dialog > .overline {
-    font-size: 6px;
+  .demo-dialog > .eyebrow {
+    font-size: 12px;
   }
   .source-excerpt p {
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 @media (max-width: 759px) and (max-height: 760px) {
@@ -1756,11 +1756,11 @@ dialog::backdrop {
     font-size: 25px;
   }
   .chapter-description {
-    font-size: 8px;
+    font-size: 12px;
     margin-top: 7px;
     max-width: 315px;
   }
-  .chapter-copy > .overline {
+  .chapter-copy > .eyebrow {
     margin-bottom: 7px;
   }
   .device-axis {
@@ -1775,11 +1775,11 @@ dialog::backdrop {
   .hero-text-wrapper h1 {
     font-size: 58px;
   }
-  .hero-text-wrapper > .overline {
-    font-size: 5px;
+  .hero-text-wrapper > .eyebrow {
+    font-size: 12px;
   }
   .hero-description {
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1827,7 +1827,7 @@ dialog::backdrop {
     font-size: 13px;
   }
   .message-name time {
-    font-size: 8px;
+    font-size: 12px;
   }
 }
 /* Rasterize the interactive screen as one plane for accurate 3D hit testing. */
@@ -1862,4 +1862,418 @@ dialog::backdrop {
   padding-left: 12px;
   color: #f0e4c3;
   text-shadow: 0 10px 25px #0008;
+}
+/* Annotation pass: readable supporting copy, without text-decoration utilities. */
+.eyebrow {
+  text-decoration: none;
+  text-decoration-line: none;
+}
+.hero-text-wrapper > .eyebrow {
+  font-size: 12px;
+  max-width: 800px;
+  justify-content: center;
+  line-height: 1.7;
+}
+.hero-description {
+  font-size: 20px;
+  line-height: 1.7;
+  max-width: 760px;
+}
+.chapter-copy {
+  width: 36%;
+  max-width: 500px;
+}
+.chapter-copy .eyebrow {
+  font-size: 12px;
+  line-height: 1.65;
+  letter-spacing: 1.3px;
+  max-width: 430px;
+}
+.chapter-description {
+  font-size: 18px;
+  line-height: 1.7;
+  max-width: 410px;
+  color: #b8c6e3;
+}
+.chapter-aside {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #e0e8fa;
+}
+.chapter-aside > span {
+  display: none;
+}
+.chapter-navigation > button b,
+.chapter-navigation > button span {
+  font-size: 12px;
+}
+.scripted-label {
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #9aaccf;
+}
+.closing-wrapper > p:not(.eyebrow) {
+  font-size: 19px;
+  line-height: 1.7;
+}
+.reading-intro > p:last-child,
+.reading-copy > p:last-child {
+  font-size: 18px;
+}
+.reading-voice-transcript p {
+  font-size: 16px;
+}
+.message-body {
+  font-size: 15px;
+  line-height: 1.6;
+}
+.message-name strong {
+  font-size: 14px;
+}
+.discord-header > span {
+  font-size: 16px;
+}
+.discord-header small {
+  font-size: 12px;
+}
+.source-link {
+  font-size: 12px;
+}
+.source-dialog > p:not(.eyebrow),
+.demo-dialog > p:not(.eyebrow),
+.source-excerpt p,
+.demo-dialog li > span {
+  font-size: 15px;
+}
+.voice-grid {
+  padding: 12px 16px 6px;
+  gap: 8px;
+}
+.voice-member {
+  height: 68px;
+  min-height: 68px;
+}
+.voice-member .avatar {
+  width: 32px;
+  height: 32px;
+  margin: 0 0 4px;
+}
+.voice-member > span:not(.avatar) {
+  font-size: 13px;
+  margin: 0;
+  line-height: 1.4;
+}
+.voice-member:last-child {
+  height: 58px;
+  min-height: 58px;
+}
+.voice-member:last-child .avatar {
+  width: 40px;
+  height: 40px;
+}
+.voice-connected {
+  font-size: 12px;
+  margin-top: 9px;
+}
+.voice-wave {
+  height: 30px;
+  min-height: 30px;
+  margin-top: 1px;
+}
+.voice-wave i {
+  animation: none;
+  transform: scaleY(0.3);
+  opacity: 0.5;
+}
+.voice-wave.is-playing i {
+  animation: voice-wave 1s ease-in-out infinite alternate;
+  opacity: 1;
+}
+.voice-wave.is-playing i:nth-child(2n) {
+  animation-direction: alternate-reverse;
+}
+.live-caption {
+  flex: 1;
+  min-height: 100px;
+  padding: 7px 16px 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.live-caption > strong {
+  font-size: 13px;
+}
+.live-caption > p {
+  font-size: 14px;
+  line-height: 1.55;
+  margin-top: 6px;
+}
+.voice-source-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: 10px;
+  row-gap: 3px;
+  margin-top: 7px;
+}
+.voice-source-links .source-link {
+  font-size: 12px;
+}
+.voice-native-controls {
+  padding: 9px 0 6px;
+  gap: 15px;
+}
+.voice-native-controls > button {
+  display: grid;
+  place-items: center;
+  background: #3a3d46;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  color: #eceef4;
+}
+.voice-native-controls > .mic-play {
+  background: #4a4e59;
+}
+.voice-native-controls > .mic-play.is-unmuted {
+  background: #65bd88;
+  color: #10241a;
+}
+.voice-native-controls > .hang-up {
+  background: #da4053;
+}
+.voice-native-controls > button:hover {
+  filter: brightness(1.2);
+}
+.voice-playback-note {
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a8b4cc;
+  padding: 0 10px 5px;
+}
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 1100px) and (min-width: 760px) {
+  .chapter-copy {
+    width: 38%;
+  }
+  .chapter-copy h2 {
+    font-size: 41px;
+  }
+  .chapter-copy .eyebrow {
+    font-size: 12px;
+    letter-spacing: 1px;
+    max-width: 340px;
+  }
+  .chapter-description {
+    font-size: 17px;
+    max-width: 350px;
+    line-height: 1.65;
+  }
+  .chapter-aside {
+    font-size: 14px;
+    max-width: 340px;
+  }
+  .chapter-navigation {
+    gap: 14px;
+  }
+  .chapter-navigation > button {
+    min-width: 70px;
+    gap: 5px;
+  }
+  .scroll-to-continue {
+    display: none;
+  }
+}
+@media (max-width: 759px) {
+  .header-caption {
+    display: none;
+  }
+  .motion-control {
+    font-size: 11px;
+  }
+  .header-cta {
+    font-size: 12px;
+  }
+  .hero-text-wrapper > .eyebrow {
+    font-size: 10px;
+    max-width: 340px;
+    letter-spacing: 1px;
+    line-height: 1.7;
+  }
+  .hero-text-wrapper h1,
+  .reading-intro h1 {
+    font-size: clamp(30px, 9.6vw, 62px);
+    letter-spacing: -2px;
+    line-height: 1.12;
+  }
+  .hero-description {
+    font-size: 16px;
+    max-width: 340px;
+    line-height: 1.7;
+  }
+  .start-experience {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  .chapter-copy {
+    width: auto;
+    max-width: none;
+  }
+  .chapter-copy > .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.6px;
+    line-height: 1.5;
+    margin-bottom: 9px;
+    max-width: 340px;
+    margin-inline: auto;
+  }
+  .chapter-copy h2 {
+    font-size: clamp(25px, 6.4vw, 43px);
+  }
+  .chapter-description {
+    font-size: 16px;
+  }
+  .chapter-aside {
+    font-size: 14px;
+  }
+  .chapter-navigation {
+    gap: 7px;
+    bottom: 37px;
+  }
+  .chapter-navigation > button {
+    min-height: 44px;
+    padding: 5px 0 9px;
+    justify-content: center;
+  }
+  .chapter-navigation > button span {
+    font-size: 13px;
+  }
+  .chapter-navigation > button b {
+    display: none;
+  }
+  .scripted-label {
+    font-size: 10px;
+    bottom: 13px;
+    letter-spacing: 0.7px;
+  }
+  .scroll-indicator > span {
+    font-size: 10px;
+    letter-spacing: 0.7px;
+  }
+  .closing-wrapper > .eyebrow {
+    font-size: 11px;
+  }
+  .closing-wrapper > p:not(.eyebrow) {
+    font-size: 16px;
+  }
+  .reading-copy > p:last-child,
+  .reading-intro > p:last-child {
+    font-size: 16px;
+  }
+  .message-body {
+    font-size: 16px;
+  }
+  .message-name strong {
+    font-size: 15px;
+  }
+  .source-dialog > p:not(.eyebrow),
+  .demo-dialog > p:not(.eyebrow),
+  .source-excerpt p {
+    font-size: 14px;
+  }
+  .site-footer,
+  .site-footer > span:first-child,
+  .site-footer > span:nth-child(2),
+  .site-footer button {
+    font-size: 11px;
+  }
+}
+@media (max-width: 759px) and (max-height: 760px) {
+  .hero-text-wrapper > .eyebrow {
+    font-size: 10px;
+  }
+  .hero-description {
+    font-size: 16px;
+  }
+  .chapter-copy > .eyebrow {
+    font-size: 10px;
+  }
+  .scripted-label {
+    bottom: 7px;
+  }
+}
+/* Fit the six-word headline on two deliberate lines at tablet widths too. */
+.hero-text-wrapper h1,
+.reading-intro h1 {
+  font-size: clamp(50px, 7.4vw, 120px);
+  letter-spacing: -0.055em;
+}
+@media (max-width: 759px) {
+  .hero-text-wrapper h1,
+  .reading-intro h1 {
+    font-size: clamp(30px, 9.6vw, 62px);
+    letter-spacing: -2px;
+  }
+}
+/* Keep centering independent from GSAP's animated x/y transforms. */
+.chapter-copy-anchor {
+  position: absolute;
+  top: 47%;
+  width: 36%;
+  max-width: 500px;
+  transform: translateY(-50%);
+  z-index: 20;
+}
+.chapter-copy-anchor.copy-left {
+  left: 8%;
+}
+.chapter-copy-anchor.copy-right {
+  right: 7%;
+}
+.chapter-copy-anchor .chapter-copy {
+  position: relative;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none;
+  width: 100%;
+  max-width: none;
+}
+@media (max-width: 1100px) and (min-width: 760px) {
+  .chapter-copy-anchor {
+    width: 38%;
+  }
+  .chapter-copy-anchor.copy-left {
+    left: 6%;
+  }
+  .chapter-copy-anchor.copy-right {
+    right: 5%;
+  }
+}
+@media (max-width: 759px) {
+  .chapter-copy-anchor {
+    top: 100px;
+    left: 7% !important;
+    right: 7% !important;
+    width: auto;
+    max-width: none;
+    transform: none;
+  }
+  .chapter-copy-anchor .chapter-copy {
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+  }
+}
+@media (max-width: 759px) and (max-height: 760px) {
+  .chapter-copy-anchor {
+    top: 83px;
+  }
 }

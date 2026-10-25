@@ -1,0 +1,114 @@
+{
+  "audio": "ray-group-call.m4a",
+  "duration": 102.342,
+  "provider": "ElevenLabs",
+  "mastering": "Per-turn peak-safe level matching",
+  "model": "eleven_multilingual_v2",
+  "voices": {
+    "Nina": "Sarah",
+    "Maya": "Matilda",
+    "Arjun": "Will",
+    "Leo": "Chris",
+    "Ray": "Jessica"
+  },
+  "cues": [
+    {
+      "person": "Nina",
+      "text": "Okay, Spring twenty twenty-seven. I'd love software engineering courses, preferably in the morning. What about everyone else?",
+      "sources": [],
+      "start": 0.1,
+      "end": 7.7161
+    },
+    {
+      "person": "Maya",
+      "text": "I'm into AI and machine learning. I want classes where we actually build something we could put in our portfolios.",
+      "sources": [],
+      "start": 7.9661,
+      "end": 14.2355
+    },
+    {
+      "person": "Arjun",
+      "text": "Databases for me. And I can't do Mondays or Wednesdays from nine until noon.",
+      "sources": [],
+      "start": 14.4855,
+      "end": 19.6403
+    },
+    {
+      "person": "Leo",
+      "text": "AI and machine learning too. Afternoons are best. I work Tuesday and Thursday mornings, so those are completely out.",
+      "sources": [],
+      "start": 19.8903,
+      "end": 26.9492
+    },
+    {
+      "person": "Maya",
+      "text": "Hey Ray, can you suggest what classes we should take for Spring twenty twenty-seven based on our preferences?",
+      "sources": [],
+      "start": 27.1992,
+      "end": 32.9577
+    },
+    {
+      "person": "Ray",
+      "text": "Absolutely! I can see a lot of common ground here. I'd start with C S E five seventy-two, Data Mining, and five seventy-three, Semantic Web Mining, for all four of you.",
+      "sources": [
+        "catalog"
+      ],
+      "start": 33.2077,
+      "end": 44.0747
+    },
+    {
+      "person": "Ray",
+      "text": "The catalog connects these courses to your AI and data interests. In our example syllabus, five seventy-three includes an agentic AI group project. That gives you something practical to build together!",
+      "sources": [
+        "catalog",
+        "syllabus"
+      ],
+      "start": 44.3247,
+      "end": 56.1205
+    },
+    {
+      "person": "Ray",
+      "text": "Maya, Arjun, and Nina, add C S E five ten for database systems. Arjun gets the database depth, and Nina gets useful backend engineering experience.",
+      "sources": [
+        "catalog"
+      ],
+      "start": 56.3705,
+      "end": 67.9804
+    },
+    {
+      "person": "Ray",
+      "text": "Leo, that morning section conflicts with work, so choose the afternoon software design course, C S E five sixty-four, instead. You still share two classes with everyone.",
+      "sources": [
+        "catalog"
+      ],
+      "start": 68.2304,
+      "end": 79.9797
+    },
+    {
+      "person": "Ray",
+      "text": "Professor review themes describe hands-on work and a demanding project. Start early, and treat those reviews as student experiences. Check the linked catalog, syllabus, and reviews before deciding.",
+      "sources": [
+        "reviews",
+        "syllabus",
+        "catalog"
+      ],
+      "start": 80.2297,
+      "end": 92.722
+    },
+    {
+      "person": "Nina",
+      "text": "I'm okay trading two mornings for classes with everyone. Let's check the sections and choose together.",
+      "sources": [],
+      "start": 92.972,
+      "end": 98.7306
+    },
+    {
+      "person": "Arjun",
+      "text": "Exactly. Ray does the research; we make the decision.",
+      "sources": [],
+      "start": 98.9806,
+      "end": 102.092
+    }
+  ],
+  "note": "Scripted illustrative scenario; course times, reviews and syllabus details are example data."
+}

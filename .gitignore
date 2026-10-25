@@ -15,3 +15,6 @@ output/
 node_modules/
 bot/dist/
 .local/
+
+# Local Sites deployment checkout; editable source lives in landing/.
+/sites/ray-landing/
