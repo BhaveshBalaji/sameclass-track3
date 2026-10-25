@@ -105,12 +105,12 @@ export class PlanningApplication {
       await tx.enqueue(response('Session reset. Use /plan start to begin a new session.'));
     });
   }
-  async ask(room: Room, eventId: string, actor: Actor, question: string): Promise<void> {
+  async ask(room: Room, eventId: string, actor: Actor, question: string, replyTo?:string): Promise<void> {
     const claimed = await this.store.transact(room,eventId,async tx => ({ term:tx.state?.term }));
     if (claimed.duplicate) return;
     const text = await this.answerCourse(question,claimed.value?.term);
     await this.store.transact(room,`answer:${eventId}`,async tx => {
-      await tx.enqueue(response(text,[actor.userId]));
+      await tx.enqueue({...response(text,[actor.userId]),requestId:eventId,replyTo});
     });
   }
   private answerCourse(question:string,term?:string):Promise<string> {
@@ -123,7 +123,7 @@ export class PlanningApplication {
       const session = await this.store.read(event);
       const direct = session?.clarifications.some(q => q.state === 'pending' && q.userId === event.userId && q.messageIds.includes(event.replyTo ?? ''));
       if (!direct && (isCourseQuestion(event.content) || !session)) {
-        await this.ask(event,event.id,event,event.content); return;
+        await this.ask(event,event.id,event,event.content,event.id); return;
       }
     }
     const claimed = await this.store.transact(event,event.id,async tx => {
@@ -176,6 +176,8 @@ export class PlanningApplication {
     const courseAnswer = !modelFailed && (intent as string) === 'course_question'
       ? await this.answerCourse(event.content,work.snapshot.term) : undefined;
     await this.store.transact(event,`finish:${work.requestId}`,async tx => {
+      const enqueue = tx.enqueue;
+      tx.enqueue = (body,guarded) => enqueue({...body,requestId:event.id,replyTo:event.id},guarded);
       const state = tx.state;
       if (!state || state.id !== work.snapshot.id) return;
       if (state.version !== work.snapshot.version || state.currentRequest !== work.requestId) {

@@ -29,6 +29,7 @@ export interface Incoming extends Room, Actor {
 }
 export interface Outgoing {
   id: string; text: string; mentions: string[]; clarificationIds: string[];
+  requestId?: string; replyTo?: string;
   buttons?: { label: string; action: 'join' | 'leave' | 'reset'; sessionId: string; token?: string; actorId?: string }[];
 }
 export interface ExtractionInput { userId: string; profile: Profile; messages: PlanningMessage[] }

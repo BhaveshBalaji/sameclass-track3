@@ -7,14 +7,15 @@ from urllib3.util.retry import Retry
 
 
 class SourceError(RuntimeError):
-    def __init__(self, service: str, message: str, *, status: int = 502, upstream_status: int | None = None):
+    def __init__(self, service: str, message: str, *, status: int = 502, upstream_status: int | None = None, retry_after: str | None = None):
         super().__init__(message)
         self.service, self.status, self.upstream_status = service, status, upstream_status
+        self.retry_after = retry_after
 
 
 def make_session() -> requests.Session:
     session = requests.Session()
-    retry = Retry(total=2, backoff_factor=0.3, status_forcelist=[429, 502, 503, 504],
+    retry = Retry(total=2, backoff_factor=0.3, status_forcelist=[502, 504],
                   allowed_methods=frozenset(['GET', 'POST']), respect_retry_after_header=False, raise_on_status=False)
     session.mount('https://', HTTPAdapter(max_retries=retry))
     return session
@@ -29,8 +30,9 @@ def request_json(session, method, url, service, timeout=(5, 20), **kwargs):
         raise SourceError(service, 'Upstream request timed out.', status=504) from None
     except requests.RequestException as exc:
         upstream = getattr(getattr(exc, 'response', None), 'status_code', None)
-        status = 503 if upstream == 429 else 502
-        raise SourceError(service, 'Upstream request failed.', status=status, upstream_status=upstream) from None
+        status = 503 if upstream in (429, 503) else 502
+        retry_after = getattr(getattr(exc, 'response', None), 'headers', {}).get('Retry-After')
+        raise SourceError(service, 'Upstream request failed.', status=status, upstream_status=upstream, retry_after=retry_after) from None
     except ValueError:
         raise SourceError(service, 'Upstream returned invalid JSON.') from None
     if isinstance(data, dict) and (data.get('errors') or data.get('error')):
@@ -51,7 +53,8 @@ def install_handlers(app):
     @app.exception_handler(SourceError)
     async def source_error_handler(request, exc):
         return JSONResponse(status_code=exc.status, content={'error': {
-            'service': exc.service, 'message': str(exc), 'upstream_status': exc.upstream_status}})
+            'service': exc.service, 'message': str(exc), 'upstream_status': exc.upstream_status}},
+            headers={'Retry-After': exc.retry_after} if exc.retry_after else None)
 
     @app.get('/health', tags=['service'])
     def health():

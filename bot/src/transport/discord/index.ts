@@ -2,7 +2,7 @@ import { semesterChoices } from '../../domain/semester.js';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, Events, GatewayIntentBits,
-  MessageFlags, PermissionFlagsBits, type Interaction, type Message } from 'discord.js';
+  MessageFlags, PermissionFlagsBits, type Interaction, type Message, type ChatInputCommandInteraction, type ButtonInteraction } from 'discord.js';
 import type { Config } from '../../config/index.js';
 import { PlanningError, type Outgoing, type Room } from '../../domain/planning.js';
 import type { PlanningApplication } from '../../application/planning.js';
@@ -22,13 +22,17 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
   const client = new Client({ intents: [GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.MessageContent],
     allowedMentions: allowedMentions([]) });
   const permitted = (guild: string | null, channel: string | null) => guild === settings.guildId && Boolean(channel && settings.channels.has(channel));
-  async function deliver(room: Room) {
+  async function deliver(room: Room, interaction?:ChatInputCommandInteraction | ButtonInteraction) {
     const channel = await client.channels.fetch(room.channelId);
     if (!channel || channel.type !== ChannelType.GuildText || channel.guildId !== room.guildId) throw new Error('Configured planning channel is not a server text channel.');
     const delivered = await app.store.deliver(room,async (body,part,text) => {
       const mentions = part === 0 ? allowedMentions(body.mentions).users : [];
       const content = `${mentions.map(id => `<@${id}>`).join(' ')}${mentions.length ? '\n' : ''}${text}`;
-      const message = await channel.send({ content, flags: MessageFlags.SuppressEmbeds, allowedMentions: allowedMentions(mentions), components: part === 0 ? components(body) : [],
+      if (part === 0 && interaction && body.requestId === interaction.id) {
+        const message = await interaction.editReply({content,flags:MessageFlags.SuppressEmbeds,allowedMentions:allowedMentions(mentions),components:components(body)});
+        return message.id;
+      }
+      const message = await channel.send({ content, ...(body.replyTo && /^\d{17,20}$/.test(body.replyTo) ? {reply:{messageReference:body.replyTo,failIfNotExists:false}} : {}), flags: MessageFlags.SuppressEmbeds, allowedMentions: allowedMentions(mentions), components: part === 0 ? components(body) : [],
         nonce: createHash('sha256').update(`${body.id}:${part}`).digest('hex').slice(0,24), enforceNonce: true });
       return message.id;
     });
@@ -47,7 +51,7 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
     const actor = { userId: interaction.user.id, name: interaction.user.displayName,
       moderator: Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels) || interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) };
     // Acknowledge before any DB/model/network wait; all controls use persistent custom IDs.
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await interaction.deferReply();
     try {
       if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'ping') {
@@ -71,8 +75,7 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
         else if (action === 'reset' && token) await app.confirmReset(room,interaction.id,actor,sessionId,token);
         else throw new Error('Unknown planning control.');
       }
-      await deliver(room);
-      await interaction.deleteReply();
+      await deliver(room,interaction);
     } catch (error) {
       // Domain messages have no credentials/model payload. Other failures get a generic diagnostic.
       const detail = error instanceof PlanningError ? error.message : 'Could not process this action. Please retry or check /plan status.';

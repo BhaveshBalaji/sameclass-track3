@@ -3,7 +3,7 @@ import { ConfigurationError, type Config } from '../../config/index.js';
 
 export const commandDefinitions = [
   new SlashCommandBuilder().setName('ping').setDescription('Check whether Ray is connected.'),
-  new SlashCommandBuilder().setName('ask').setDescription('Ask a course or syllabus question without joining planning.')
+  new SlashCommandBuilder().setName('ask').setDescription('Ask Ray about courses, syllabi or professors (processed by OpenRouter).')
     .addStringOption(o => o.setName('question').setDescription('Your course/syllabus question').setRequired(true).setMaxLength(1000)),
   new SlashCommandBuilder().setName('plan').setDescription('Manage a shared class-planning session.')
     .addSubcommand(c => c.setName('start').setDescription('Create a planning workspace in this channel.')

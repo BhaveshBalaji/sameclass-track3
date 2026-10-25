@@ -40,7 +40,7 @@ export class PlanningStore {
         enqueue: async (response, guarded = false) => {
           await client.query(`INSERT INTO ray_app.planning_outbox(id,namespace,room_id,session_id,snapshot_version,body)
             VALUES($1,$2,$3,$4,$5,$6)`, [response.id,this.namespace,id,tx.state?.id ?? null,
-              guarded ? tx.state?.version : null,JSON.stringify(response)]);
+              guarded ? tx.state?.version : null,JSON.stringify({requestId:eventId,...response})]);
         } };
       const value = await apply(tx);
       await client.query(`UPDATE ray_app.planning_rooms SET state=$3 WHERE namespace=$1 AND room_id=$2`, [this.namespace,id,tx.state ? JSON.stringify(tx.state) : null]);
@@ -79,7 +79,7 @@ export class PlanningStore {
           if (row.session_id && session?.id !== row.session_id) {
             await client.query("UPDATE ray_app.planning_outbox SET status='cancelled' WHERE id=$1", [id]); body = undefined;
           } else if (row.snapshot_version !== null && session?.version !== Number(row.snapshot_version)) {
-            body = { id, text: 'New messages arrived while I was working. Mention me again for an updated summary.', mentions: [], clarificationIds: [] };
+            body = { id, requestId:body.requestId,replyTo:body.replyTo, text: 'New messages arrived while I was working. Mention me again for an updated summary.', mentions: [], clarificationIds: [] };
             if (session) {
               const removed = session.clarifications.filter(q => q.responseId === id);
               session.clarifications = session.clarifications.filter(q => q.responseId !== id);

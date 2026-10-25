@@ -22,6 +22,7 @@
     "db:stop": "node scripts/database.mjs down",
     "test:planning": "npm run test:planning --workspace bot",
     "replay": "npm run replay --workspace bot --",
-    "register:commands": "npm run register:commands --workspace bot"
+    "register:commands": "npm run register:commands --workspace bot",
+    "check:research": "npm run check:research --workspace bot --"
   }
 }

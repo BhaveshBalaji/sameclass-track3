@@ -1,6 +1,6 @@
 # Ray Discord bot: implementation milestones
 
-Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestones 0–2 are complete, including live API checks and the user-confirmed Discord catalog answer and semester picker. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
+Plan accepted in principle by the team on October 24, 2026 (America/Phoenix). Milestones 0–2 are complete. Milestone 3 implementation and live research checks are in place; its new Discord answers and command/reply visibility are awaiting the user’s smoke check. Complete one milestone, report its evidence and limitations, and wait for the next milestone before continuing. This file is the canonical build checklist; it supersedes the earlier open interview questions where decisions are recorded below.
 
 ## 1. Agreed scope
 
@@ -244,6 +244,8 @@ This is the original brief's first implementation milestone. Use the following s
 
 **Build**
 
+- Replace template-based `/ask` answers with an LLM planner, scoped tool workers and evidence-based answer writer. Use the same path for one-off course mentions.
+- Preserve user messages and slash-command context: public interaction responses, native replies to mentions, no deletion of original commands/messages.
 - Implement bounded LangGraph branches/subgraphs and validated worker envelopes with task/entity IDs, status, findings, sources, retrieval time, historical applicability and safe limitations/errors.
 - Start from configurable limits: 12 candidate sections, 12 total research tasks per request, four concurrent tasks globally, two per source/model provider, four tool steps per worker, a 20-second worker deadline and a 90-second total request deadline. These are initial bounds to tune after the first run, not benchmarked performance guarantees. Stop expansion when a budget is reached and show partial coverage.
 - Resolve exact offering identity before syllabus work. Try the selected term/class number first; use the agreed historical same-instructor then other-instructor fallback with clear labels. Return unavailable when text requires unimplemented OCR.
@@ -347,7 +349,7 @@ Do not automate ordinary user accounts or pretend webhook/bot messages are disti
 - [x] Milestone 0: local foundation, portable configuration, runtime/model/checkpointer checks and scenarios. See verification below.
 - [x] Milestone 1: Discord preference workflow, replay checks, user-confirmed live smoke test and restart persistence.
 - [x] Milestone 2: live catalog path, readable semester picker, quieter replies and user-confirmed Discord answer.
-- [ ] Milestone 3: bounded parallel research.
+- [ ] Milestone 3: implemented; new Discord research/visibility smoke pending. Original scope: bounded parallel research.
 - [ ] Milestone 4: group recommendations, refinement and expanded complex-workflow mock suite.
 - [ ] Milestone 5: Render/Supabase deployment, configuration parity and demo.
 - [ ] Optional Milestone 6: owned chat UI.
@@ -383,3 +385,13 @@ Live Spring 2027 API checks: CSE 512 returned zero listings with complete/exhaus
 The TypeScript build, 16 offline tests, 10 database integration tests and deterministic replay passed. Contract/state tests cover readable semester mapping and ambiguity, base-path preservation, source identity mismatch, unknown/zero seats, absent instructors/times, incomplete/empty searches, source failure and nonparticipant question isolation/deduplication. The deterministic four-student preference replay remains intact. The user confirmed “The answer and semester picker look good” after the requested private-server smoke check. This verifies the rendered live catalog answer and readable semester autocomplete in Discord. Milestone 2 is complete. Stop before Milestone 3.
 
 Milestone 2 response-scope correction: professor-only questions now deduplicate names across every fetched section, including beyond the eight-section display limit, and return a single source citation rather than a full seat/meeting listing. Unknown instructor assignments and partial coverage remain explicit. Combined questions retain the requested fields; Discord source-preview cards are suppressed. Regression tests cover duplicate/co-taught names, a new name on the ninth section, unassigned/empty/partial results and combined/time-only queries. A live CSE 240 Spring 2027 check returned Ajay Bansal, Eric Eckert and Erik Trickel, with two sections lacking listed instructors.
+
+## Milestone 3 verification
+
+Implemented on `demo`: LangGraph plan/research/answer nodes, AI SDK ToolLoopAgent workers with immutable task scopes, typed ASU/RMP tools, shared process-level concurrency and deadline controls, request/model/source budgets, settled partial results and bounded evidence caching. Source text is untrusted input, tools have no arbitrary URL/network capability, and final source destinations are appended from validated evidence. The planner and answer writer use the shared Relace-pinned DeepSeek client. Checkpoints retain request ID/status only; research is retried with a new request after restart rather than silently resumed.
+
+Syllabus work verifies the exact offering before exact term/class text and a labeled historical fallback. Live CSE 575 Spring 2027/Yingzhen Yang research found Fall 2026 section 65678 as same-instructor historical evidence; its exam weights were explicitly historical. RMP identity was confirmed against ASU school and computing department, and paginated reviews retained source dates/raw course labels and sample coverage. A successful combined run completed in roughly 15 seconds with seven model calls. A catalog-only CSE 240 question used three model calls and one source operation and produced a concise instructor answer. An initial live contract mismatch for RMP string rating tags was fixed; subsequent review retrieval passed. The planner was tightened to look up explicit future semesters rather than assuming they were unavailable.
+
+Controlled checks demonstrate overlap/global and per-source caps, in-flight deduplication, TTL/refresh, cancellation without prematurely releasing an underlying-operation slot, sibling failure isolation, Retry-After/cooldown handling, labeled historical/OCR results, wrong-school rejection and retention of a review page when the next page fails. The TypeScript build, 24 offline tests, 10 database integration tests, four-student replay, 53 Python tests and Python lint pass. A deterministic SDK/graph run verifies planning, real tool execution and synthesis without a live model. Public slash responses retain their command context; mention answers reference the original message. No user-message deletion is implemented. A human Discord smoke check for these new interactions is pending.
+
+Limitations: department matching is deliberately conservative for computing subjects; uncertain matches remain ambiguous. Requests are self-contained and do not inherit arbitrary prior research dialogue. Cache is process-local and public-source-only. Model answers still require evaluation; hard limits/source checks do not guarantee every natural-language claim. Group ranking/linked-component compatibility remains Milestone 4. Stop before Milestone 4.

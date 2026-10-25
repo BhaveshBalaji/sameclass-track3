@@ -149,6 +149,10 @@ test('catalog slash and mention questions by a nonparticipant are deduplicated a
   assert.equal(sourceCalls,1);assert.match(h.delivered.at(-1)!.text,/Example Instructor/);
   await app.message({...h.room,...actor,id:'catalog-mention',botMention:true,content:'Who teaches CSE 575 and are there seats?'});await h.drain();
   assert.equal(sourceCalls,2);assert.deepEqual(await h.store.read(h.room),before);
+  const command=await pool.query("SELECT body FROM ray_app.planning_outbox WHERE namespace=$1 AND body->>'requestId'='catalog-ask'",[h.namespace]);
+  assert.equal(command.rows[0].body.requestId,'catalog-ask');
+  const reply=await pool.query("SELECT body FROM ray_app.planning_outbox WHERE namespace=$1 AND body->>'requestId'='catalog-mention'",[h.namespace]);
+  assert.equal(reply.rows[0].body.replyTo,'catalog-mention');
 });
 test('a readable semester is stored as a code but all planning output uses its name',async()=>{
   const h=setup();await h.app.start(h.room,'readable',data.actors[0]!,'Spring 2027');await h.drain();
