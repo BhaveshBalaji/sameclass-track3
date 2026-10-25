@@ -8,6 +8,7 @@ import { PlanningError, type Outgoing, type Room } from '../../domain/planning.j
 import type { PlanningApplication } from '../../application/planning.js';
 import { discordSettings,voiceCommandAllowed } from './commands.js';
 import { DiscordVoice } from './voice.js';
+import { voiceRouter } from '../../voice/router.js';
 import { PlanningVoiceBackend } from '../../application/voice.js';
 
 export function allowedMentions(ids: string[]) {
@@ -50,7 +51,8 @@ export async function connectDiscord(config: Config, app: PlanningApplication): 
     });
     if (!delivered) throw new Error('Discord delivery could not be confirmed.');
   }
-  const voice = new DiscordVoice(config,client,app,(room,sessionId)=>new PlanningVoiceBackend(app,room,sessionId,()=>deliver(room)));
+  const route=config.VOICE_ENABLED?voiceRouter(config):undefined;
+  const voice = new DiscordVoice(config,client,app,(room,sessionId)=>new PlanningVoiceBackend(app,room,sessionId,()=>deliver(room),route));
   client.once(Events.ClientReady,()=>{if(config.VOICE_ENABLED)console.log('Voice Ray controls are enabled.');});
   client.on(Events.VoiceStateUpdate,(_before,after)=>{
     if(after.id===client.user?.id&&after.channelId!==config.DISCORD_VOICE_CHANNEL_ID)voice.close();

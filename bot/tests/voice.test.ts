@@ -7,6 +7,7 @@ import { parseConfig } from '../src/config/index.js';
 import { discordPCM, SpeechDecoder,SpeechActivityGate } from '../src/voice/audio.js';
 import { ElevenAgent, ScribeUtterance, type AgentCallbacks } from '../src/voice/elevenlabs.js';
 import { addressesRay, VoiceSession, type ConversationalConnection } from '../src/voice/session.js';
+import { voiceRouter } from '../src/voice/router.js';
 import { PlanningVoiceBackend } from '../src/application/voice.js';
 import type { PlanningApplication } from '../src/application/planning.js';
 import { commandDefinitions,discordSettings,voiceCommandAllowed } from '../src/transport/discord/commands.js';
@@ -154,7 +155,7 @@ test('audio-idle completion waits for tool results and final answer text when th
   await new Promise(resolve=>setTimeout(resolve,25));assert.equal(completions,1);
 });
 
-test('roster consent, explicit addressing on every turn, pause and stale callbacks are enforced',async()=>{
+test('roster consent, direct-address outage fallback, pause and stale callbacks are enforced',async()=>{
   let authorized=true;const intake:string[]=[],tools:string[]=[],callbacks:AgentCallbacks[]=[];let plays=0,stops=0;
   const session=new VoiceSession(config,{
     authorized:async()=>authorized,intake:async(a,_id,text)=>{intake.push(a.userId+':'+text);},
@@ -264,7 +265,7 @@ test('partial transcription can identify a Ray interruption without admitting fr
   assert.equal(interruptions,1);assert.equal(finals,0);scribe.close();
 });
 
-test('bare Ray requests work and consecutive tool speech does not evict the original user topic',async()=>{
+test('bare Ray requests work and shared context preserves speaker attribution and the original topic',async()=>{
   const contexts:string[]=[],callbacks:AgentCallbacks[]=[];
   const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},tool:async()=>({})},
     {audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},cb=>{callbacks.push(cb);return {start:async context=>{contexts.push(context);},message:()=>{},close:()=>{}};});
@@ -273,7 +274,7 @@ test('bare Ray requests work and consecutive tool speech does not evict the orig
   callbacks[0]!.text('Let me check.');callbacks[0]!.text('Which semester?');callbacks[0]!.complete();
   await session.transcript(other.userId,'Ray, tell me about biology.');callbacks[1]!.complete();
   await session.transcript(actor.userId,'Ray, Spring 2027.');
-  assert.match(contexts[2]!,/database courses/);assert.match(contexts[2]!,/Which semester/);assert.doesNotMatch(contexts[2]!,/biology|Let me check/);
+  assert.match(contexts[2]!,/database courses/);assert.match(contexts[2]!,/Which semester/);assert.match(contexts[2]!,/biology/);assert.match(contexts[2]!,/bob/);assert.doesNotMatch(contexts[2]!,/Let me check/);
   callbacks[2]!.complete();await session.transcript(actor.userId,'Ray');assert.equal(callbacks.length,4);session.close();
 });
 
@@ -292,4 +293,77 @@ test('audio completion waits for queued PCM playback across gaps in fast provide
   socket.event({type:'audio',audio_event:{audio_base_64:Buffer.alloc(3200).toString('base64')}});
   await new Promise(resolve=>setTimeout(resolve,100));assert.equal(completions,0);
   await new Promise(resolve=>setTimeout(resolve,110));assert.equal(completions,1);
+});
+
+test('ambient routing retains passive shared context, answers without a name, and only interrupts for a routed request',async()=>{
+  const callbacks:AgentCallbacks[]=[],messages:string[]=[],contexts:string[]=[],toolRequests:string[]=[],inputs:import('../src/voice/session.js').VoiceRoutingInput[]=[];
+  let closed=0,played=0;
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},
+    route:async input=>{inputs.push(input);return {action:input.utterance.startsWith('Can you')?'reply':'listen',request:input.utterance+' for Spring 2027'};},
+    tool:async(_actor,_call,_signal,utterance)=>{toolRequests.push(utterance);return {};},
+  },{audio:()=>played++,stop:()=>{},finish:()=>{},status:()=>{}},cb=>{callbacks.push(cb);return {start:async context=>{contexts.push(context);},message:text=>messages.push(text),close:()=>closed++};});
+  session.join(actor);session.join(other);
+  await session.transcript(actor.userId,'We are choosing Spring 2027.');assert.equal(callbacks.length,0);
+  await session.transcript(other.userId,'Can you find database courses?');assert.equal(callbacks.length,1);
+  assert.match(contexts[0]!,/Spring 2027/);assert.match(contexts[0]!,/alice/);
+  await callbacks[0]!.tool({tool_name:'research_course',tool_call_id:'1',parameters:{}},new AbortController().signal);
+  assert.match(toolRequests[0]!,/Spring 2027/);
+  await session.transcript(actor.userId,'Bob, do you want lunch?');assert.equal(closed,0);
+  callbacks[0]!.audio(Buffer.alloc(8),16000);assert.equal(played,1);
+  await session.transcript(actor.userId,'Can you show the CSE 412 syllabus instead?');assert.equal(closed,1);assert.equal(callbacks.length,2);
+  assert.equal(inputs.at(-1)!.rayBusy,true);assert.match(messages[1]!,/CSE 412/);
+  callbacks[0]!.audio(Buffer.alloc(8),16000);assert.equal(played,1);
+  await assert.rejects(()=>callbacks[0]!.tool({tool_name:'research_course',tool_call_id:'stale',parameters:{}},new AbortController().signal),/expired/);
+  callbacks[1]!.audio(Buffer.alloc(8),16000);assert.equal(played,2);session.close();
+});
+
+test('ambient routing accepts a clarification answer and supports stop without another provider call',async()=>{
+  const messages:string[]=[];let callback!:AgentCallbacks,closed=0;
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},tool:async()=>({}),route:async input=>{
+    if(input.utterance==='Stop talking for a moment.')return {action:'stop',request:''};
+    return {action:'reply',request:input.utterance==='Spring 2027.'?'Find database courses in Spring 2027.':input.utterance};
+  }},{audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},cb=>{callback=cb;return {start:async()=>{},message:text=>messages.push(text),close:()=>closed++};});
+  session.join(actor);await session.transcript(actor.userId,'Find database courses next semester.');
+  callback.text('Which semester?');callback.complete();
+  await session.transcript(actor.userId,'Spring 2027.');assert.equal(messages.length,2);assert.match(messages[1]!,/Find database courses in Spring 2027/);
+  await session.transcript(actor.userId,'Stop talking for a moment.');assert.equal(messages.length,2);assert.equal(closed,2);session.close();
+});
+
+test('queued conversational decisions preserve order, and pause invalidates a pending semantic decision',async()=>{
+  let release!:()=>void,entered!:()=>void;const waiting=new Promise<void>(r=>{entered=r;}),pending=new Promise<void>(r=>{release=r;});
+  const messages:string[]=[];let first=true;
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},tool:async()=>({}),route:async input=>{
+    if(first){first=false;entered();await pending;}return {action:'reply',request:input.utterance};
+  }},{audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},()=>({start:async()=>{},message:text=>messages.push(text),close:()=>{}}));
+  session.join(actor);
+  const a=session.transcript(actor.userId,'Find database courses.');await waiting;
+  const b=session.transcript(actor.userId,'Actually, use Spring 2027.');release();await Promise.all([a,b]);
+  assert.equal(messages.length,2);assert.match(messages[0]!,/Find database/);assert.match(messages[1]!,/Spring 2027/);session.close();
+  let resolve!:()=>void,started!:()=>void;const hold=new Promise<void>(r=>{resolve=r;}),ready=new Promise<void>(r=>{started=r;});let calls=0;
+  const paused=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},tool:async()=>({}),route:async()=>{started();await hold;return {action:'reply',request:'stale'};}},
+    {audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},()=>({start:async()=>{calls++;},message:()=>{},close:()=>{}}));
+  paused.join(actor);const stale=paused.transcript(actor.userId,'Can you find courses?');await ready;paused.pause();paused.resume();resolve();await stale;assert.equal(calls,0);paused.close();
+});
+
+test('a routing outage keeps ordinary speech as context and preserves the optional direct-address fallback',async()=>{
+  let calls=0;const contexts:string[]=[];
+  const session=new VoiceSession(config,{authorized:async()=>true,intake:async()=>{},tool:async()=>({}),route:async()=>{throw new Error('Synthetic timeout');}},
+    {audio:()=>{},stop:()=>{},finish:()=>{},status:()=>{}},()=>({start:async text=>{contexts.push(text);calls++;},message:()=>{},close:()=>{}}));
+  session.join(actor);await session.transcript(actor.userId,'I need Spring 2027.');assert.equal(calls,0);
+  await session.transcript(actor.userId,'Ray, find database courses.');assert.equal(calls,1);assert.match(contexts[0]!,/Spring 2027/);session.close();
+});
+
+
+test('semantic routing uses the configured model with attributed bounded context and a constrained decision',async()=>{
+  const c=parseConfig({OPENROUTER_API_KEY:'synthetic'});
+  const route=voiceRouter(c,async(_input,init)=>{
+    const body=JSON.parse(String(init?.body)),input=JSON.parse(body.messages.at(-1).content);
+    assert.equal(body.model,c.OPENROUTER_MODEL);assert.equal(input.speaker.userId,'alice');assert.equal(input.conversation[0].userId,'bob');
+    assert.match(JSON.stringify(body.messages[0].content),/No wake word is required/);
+    return Response.json({id:'test',provider:'Relace',model:c.OPENROUTER_MODEL,object:'chat.completion',created:1,
+      choices:[{index:0,message:{role:'assistant',content:JSON.stringify({action:'reply',request:'Find database courses in Spring 2027.'})},finish_reason:'stop'}],usage:{prompt_tokens:10,completion_tokens:10,total_tokens:20}});
+  });
+  const result=await route({speaker:actor,utterance:'Can you find database courses?',participants:[actor,other],rayBusy:false,
+    conversation:[{userId:'bob',role:'human',text:'Bob: We chose Spring 2027.'}]},new AbortController().signal);
+  assert.deepEqual(result,{action:'reply',request:'Find database courses in Spring 2027.'});
 });

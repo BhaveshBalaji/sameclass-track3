@@ -7,7 +7,7 @@ import type { VoiceToolCall } from '../voice/elevenlabs.js';
 const questionSchema=z.object({question:z.string().trim().min(1).max(2000)}).strict();
 
 export class PlanningVoiceBackend implements VoiceBackend {
-  constructor(private app:PlanningApplication,private room:Room,private sessionId:string,private deliver:()=>Promise<void>){}
+  constructor(private app:PlanningApplication,private room:Room,private sessionId:string,private deliver:()=>Promise<void>,readonly route?:VoiceBackend['route']){}
   async authorized(actor:Actor):Promise<boolean>{
     const state=await this.app.store.read(this.room);
     return state?.id===this.sessionId&&Boolean(state.participants[actor.userId]);

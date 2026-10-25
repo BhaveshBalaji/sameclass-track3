@@ -1,3 +1,4 @@
+import {voiceRouter} from '../src/voice/router.js';
 import {ResearchAgent} from '../src/research/agent.js';
 import {ResearchSources} from '../src/research/sources.js';
 import {ResearchScheduler} from '../src/research/scheduler.js';
@@ -16,6 +17,23 @@ async function main(){
     aes256gcm:getCiphers().includes('aes-256-gcm'),missing,liveRequested:process.argv.includes('--live')}));
   if(missing.length)throw new ConfigurationError(`Missing voice configuration: ${missing.join(', ')}`);
   if(!process.argv.includes('--live'))return;
+  if(process.argv.includes('--routing')){
+    const route=voiceRouter(config),speaker={userId:'synthetic:alice',name:'Alice'},friend={userId:'synthetic:bob',name:'Bob'};
+    const conversation=[{userId:speaker.userId,role:'human' as const,text:'Alice: We are planning for Spring 2027.'}];
+    const cases=[
+      {utterance:'Can you find database courses?',expected:'reply',semester:true},
+      {utterance:'Bob, do you want lunch?',expected:'listen',semester:false},
+      {utterance:'Actually, show me the CSE 412 syllabus instead.',expected:'reply',semester:true},
+      {utterance:'Stop talking for a moment.',expected:'stop',semester:false},
+    ];
+    for(let index=0;index<cases.length;index++){
+      const item=cases[index]!;
+      const result=await route({speaker,utterance:item.utterance,participants:[speaker,friend],conversation,rayBusy:true},AbortSignal.timeout(10000));
+      if(result.action!==item.expected||(item.semester&&!/Spring 2027/i.test(result.request)))throw new Error(`Synthetic voice routing case ${index+1} failed.`);
+      console.log(JSON.stringify({check:'voice_routing',synthetic:true,case:index+1,action:result.action,passed:true}));
+    }
+    return;
+  }
   // OPT-IN PAID: one synthetic generated conversation/tool round trip; no Discord posts.
   const research=process.argv.includes('--research');
   let bytes=0,toolCalls=0,toolReturned=false,postToolAudioBytes=0;const chunks:Buffer[]=[];
@@ -45,7 +63,7 @@ async function main(){
       failed:()=>{clearTimeout(timer);reject(new Error('Voice provider proof failed.'));},
     });
     void agent.start('Synthetic integration check. The current speaker is Synthetic Probe. No real student data.').then(()=>{
-      agent.message(research?'Ray, please find database-related courses for Spring 2027.':'Hey Ray, please use your notes tool to read back my saved preferences.');
+      agent.message(research?'Please find database-related courses for Spring 2027.':'Hey Ray, please use your notes tool to read back my saved preferences.');
     }).catch(error=>{clearTimeout(timer);agent.close();reject(error);});
   });
   if(process.argv.includes('--scribe')){
